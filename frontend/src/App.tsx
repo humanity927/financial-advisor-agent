@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import AppShell from './app/layout/AppShell';
 import OverviewPage from './features/overview/OverviewPage';
+import AdvisorPage from './features/advisor/AdvisorPage';
 
 const LazyPage = ({ title }: { title: string }) => (
   <div style={{ padding: 48, color: '#667085', textAlign: 'center' }}>
@@ -18,7 +19,7 @@ export default function App() {
           <Route path="market" element={<LazyPage title="行情对比" />} />
           <Route path="risk" element={<LazyPage title="风险实验室" />} />
           <Route path="portfolio" element={<LazyPage title="配置规划" />} />
-          <Route path="advisor" element={<LazyPage title="Agent 报告" />} />
+          <Route path="advisor" element={<AdvisorPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
