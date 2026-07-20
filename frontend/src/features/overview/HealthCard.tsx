@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { Card, Descriptions, Tag, Spin } from 'antd';
+import { Card, Descriptions, Tag, Skeleton } from 'antd';
 import { client } from '../../api/client';
 import { queryKeys } from '../../api/keys';
 import type { HealthStatus } from '../../api/types';
 import StatusBadge from '../../components/StatusBadge';
+import PageState from '../../components/PageState';
 
 export default function HealthCard() {
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: queryKeys.health,
     queryFn: ({ signal }) => client.get<HealthStatus>('/health', signal),
   });
@@ -14,7 +15,7 @@ export default function HealthCard() {
   if (isLoading) {
     return (
       <Card title="系统健康">
-        <Spin style={{ display: 'flex', justifyContent: 'center', padding: 32 }} />
+        <Skeleton active paragraph={{ rows: 4 }} />
       </Card>
     );
   }
@@ -22,8 +23,7 @@ export default function HealthCard() {
   if (isError || !data?.ok) {
     return (
       <Card title="系统健康">
-        <StatusBadge status="error" />
-        <span style={{ marginLeft: 8, color: 'var(--color-text-secondary)' }}>健康检查失败</span>
+        <PageState state="error" error={error instanceof Error ? error.message : '健康检查失败'} onRetry={refetch} />
       </Card>
     );
   }

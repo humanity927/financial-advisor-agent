@@ -21,3 +21,9 @@
   overflow-y: auto;
   background: var(--color-bg);
 }
+
+/* Card 微弱阴影 */
+.shell-content .ant-card {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  border-radius: var(--radius-lg);
+}

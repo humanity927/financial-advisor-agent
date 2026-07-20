@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Card, Table, Descriptions, Tag } from 'antd';
+import { Card, Table, Descriptions, Tag, Skeleton } from 'antd';
 import { client } from '../../api/client';
 import { queryKeys } from '../../api/keys';
 import type { AllocationResult } from '../../api/types';
@@ -21,7 +21,14 @@ export default function AllocationPreview() {
     queryFn: ({ signal }) => client.post<AllocationResult>('/portfolio/plan', DUMMY_PROFILE, signal),
   });
 
-  if (isLoading) return <PageState state="loading" />;
+  if (isLoading) {
+    return (
+      <Card title="配置预览">
+        <Skeleton active paragraph={{ rows: 4 }} />
+      </Card>
+    );
+  }
+
   if (isError || !data?.ok) {
     return <PageState state="error" error={error instanceof Error ? error.message : '配置加载失败'} onRetry={refetch} />;
   }

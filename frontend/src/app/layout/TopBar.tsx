@@ -1,7 +1,18 @@
-import { Tag } from 'antd';
-import { Clock } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Tag, Spin } from 'antd';
+import { Clock, Wifi, Database } from 'lucide-react';
+import { client } from '../../api/client';
+import { queryKeys } from '../../api/keys';
+import SourceStamp from '../../components/SourceStamp';
+import type { HealthStatus } from '../../api/types';
 
 export default function TopBar() {
+  const { data, isLoading } = useQuery({
+    queryKey: queryKeys.health,
+    queryFn: ({ signal }) => client.get<HealthStatus>('/health', signal),
+    refetchInterval: 30_000,
+  });
+
   return (
     <div
       style={{
@@ -19,15 +30,35 @@ export default function TopBar() {
         gap: 16,
       }}
     >
-      <Tag color="blue" icon={<Clock size={14} />}>
-        fixture 模式
-      </Tag>
-      <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-        数据来源：演示数据
-      </span>
-      <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-        Agent 状态：未连接
-      </span>
+      {isLoading ? (
+        <Spin size="small" />
+      ) : data?.ok ? (
+        <>
+          <Tag
+            color={data.data.force_fixture ? 'orange' : 'green'}
+            icon={<Database size={14} />}
+          >
+            {data.data.force_fixture ? '演示模式' : '实时模式'}
+          </Tag>
+          <SourceStamp
+            source={data.data.fixture_available ? 'fixture' : 'system'}
+          />
+          <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
+            <Wifi size={13} style={{ verticalAlign: 'text-bottom', marginRight: 4 }} />
+            AKShare {data.data.akshare_installed ? '已就绪' : '未安装'}
+          </span>
+        </>
+      ) : (
+        <>
+          <Tag color="orange" icon={<Clock size={14} />}>fixture 模式</Tag>
+          <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
+            数据来源：演示数据
+          </span>
+          <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
+            Agent 状态：未连接
+          </span>
+        </>
+      )}
     </div>
   );
 }
