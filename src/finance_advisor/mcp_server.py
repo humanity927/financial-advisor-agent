@@ -16,9 +16,20 @@ from finance_advisor.market.cache_provider import CacheProvider
 from finance_advisor.market.fixture_provider import FixtureProvider
 from finance_advisor.market.models import MarketSeries
 from finance_advisor.market.service import MarketService
-from finance_advisor.market.symbols import SymbolValidationError, normalize_symbols
+from finance_advisor.market.symbols import (
+    SymbolInfo,
+    SymbolValidationError,
+    normalize_symbol,
+    normalize_symbols,
+)
 from finance_advisor.risk.metrics import InsufficientDataError, calculate_risk_metrics
-from finance_advisor.risk.profile import assess_profile
+from finance_advisor.risk.portfolio import (
+    InsufficientCommonDataError,
+    PortfolioValidationError,
+    calculate_portfolio_risk,
+    validate_portfolio_weights,
+)
+from finance_advisor.risk.profile import assess_profile, profile_chart_data
 from finance_advisor.schemas import (
     IncomeStability,
     InvestmentExperience,
@@ -68,6 +79,25 @@ def _source_for(series: list[MarketSeries]) -> str:
 
 def _warnings_for(series: list[MarketSeries]) -> list[str]:
     return list(dict.fromkeys(item.warning for item in series if item.warning))
+
+
+def _normalize_portfolio_weights(
+    weights_pct: dict[str, float],
+) -> tuple[list[SymbolInfo], dict[str, float]]:
+    if not weights_pct:
+        raise PortfolioValidationError("weights_pct至少需要一个标的")
+    if len(weights_pct) > 4:
+        raise PortfolioValidationError("weights_pct一次最多包含4个标的")
+
+    symbols: list[SymbolInfo] = []
+    normalized: dict[str, float] = {}
+    for raw_symbol, weight in weights_pct.items():
+        symbol = normalize_symbol(raw_symbol)
+        if symbol.symbol in normalized:
+            raise PortfolioValidationError(f"标的{symbol.symbol}通过代码或别名重复出现")
+        symbols.append(symbol)
+        normalized[symbol.symbol] = weight
+    return symbols, validate_portfolio_weights(normalized)
 
 
 PROFILE_FIELDS = {
@@ -182,7 +212,9 @@ def assess_investor_profile(
     if isinstance(profile, dict):
         return profile
     assessment = assess_profile(profile)
-    return success_response(assessment.model_dump(mode="json"))
+    data = assessment.model_dump(mode="json")
+    data["dimensions"] = profile_chart_data(assessment)
+    return success_response(data)
 
 
 @mcp.tool()
@@ -259,6 +291,90 @@ def analyze_asset_risk(
         as_of=as_of,
         is_fallback=any(item.is_fallback for item in loaded),
         warnings=list(dict.fromkeys(_warnings_for(loaded) + warnings)),
+        request_id=request_id,
+    )
+
+
+@mcp.tool()
+def analyze_portfolio_risk(
+    weights_pct: dict[str, float],
+    lookback_days: int = 252,
+) -> dict[str, Any]:
+    """计算1到4个白名单ETF固定权重组合的历史相关性、净值、回撤、VaR和CVaR。"""
+    request_id = str(uuid4())
+    if lookback_days < 60 or lookback_days > 1260:
+        return error_response(
+            "invalid_lookback",
+            "lookback_days必须在60到1260之间",
+            request_id=request_id,
+        )
+
+    try:
+        symbols, normalized_weights = _normalize_portfolio_weights(weights_pct)
+    except SymbolValidationError as exc:
+        return error_response("invalid_symbol", str(exc), request_id=request_id)
+    except PortfolioValidationError as exc:
+        return error_response("invalid_weights", str(exc), request_id=request_id)
+
+    try:
+        loaded = [get_market_service().get_history(symbol, lookback_days) for symbol in symbols]
+        analysis = calculate_portfolio_risk(loaded, normalized_weights)
+    except InsufficientCommonDataError as exc:
+        return success_response(
+            {
+                "portfolio": None,
+                "assets": [
+                    {
+                        "symbol": symbol.symbol,
+                        "name": symbol.name,
+                        "asset_class": symbol.asset_class,
+                        "weight_pct": normalized_weights[symbol.symbol],
+                    }
+                    for symbol in symbols
+                ],
+                "method": "历史数据统计，不代表未来表现",
+            },
+            warnings=[str(exc)],
+            request_id=request_id,
+        )
+    except PortfolioValidationError as exc:
+        return error_response("invalid_weights", str(exc), request_id=request_id)
+    except Exception:
+        LOGGER.exception("portfolio risk analysis failed request_id=%s", request_id)
+        return error_response(
+            "portfolio_risk_failed",
+            "组合风险计算失败，请检查历史数据和权重",
+            retryable=True,
+            request_id=request_id,
+        )
+
+    assets = [
+        {
+            "symbol": symbol.symbol,
+            "name": symbol.name,
+            "asset_class": symbol.asset_class,
+            "weight_pct": normalized_weights[symbol.symbol],
+            "source": item.source,
+            "warning": item.warning,
+        }
+        for symbol, item in zip(symbols, loaded, strict=True)
+    ]
+    return success_response(
+        {
+            "portfolio": analysis.as_dict(),
+            "assets": assets,
+            "method": "固定权重每日再平衡的历史组合统计，不代表未来表现",
+        },
+        source=_source_for(loaded),
+        as_of=analysis.metrics.end_date,
+        is_fallback=any(item.is_fallback for item in loaded),
+        warnings=list(
+            dict.fromkeys(
+                _warnings_for(loaded)
+                + list(analysis.warnings)
+                + ["历史相关性和风险指标不代表未来表现"]
+            )
+        ),
         request_id=request_id,
     )
 

@@ -59,6 +59,15 @@ def test_market_and_risk_tools_use_explicit_fixture(monkeypatch: object, tmp_pat
     assert risk["ok"] is True
     assert risk["data"]["assets"][0]["metrics"]["observation_count"] == 81
 
+    portfolio = server.analyze_portfolio_risk({"510300": 60.0, "511010": 40.0}, 80)
+    assert portfolio["ok"] is True
+    assert portfolio["meta"]["source"] == "fixture"
+    assert portfolio["data"]["portfolio"]["portfolio_metrics"]["observation_count"] == 81
+    assert portfolio["data"]["portfolio"]["correlation_matrix"]["symbols"] == [
+        "510300",
+        "511010",
+    ]
+
 
 def test_invalid_symbol_and_lookback_are_structured_errors() -> None:
     invalid_symbol = server.get_market_snapshot(["000001"])
@@ -66,3 +75,11 @@ def test_invalid_symbol_and_lookback_are_structured_errors() -> None:
 
     assert invalid_symbol["error"]["code"] == "invalid_symbol"
     assert invalid_lookback["error"]["code"] == "invalid_lookback"
+
+
+def test_invalid_portfolio_weights_are_structured_errors() -> None:
+    bad_total = server.analyze_portfolio_risk({"510300": 80.0}, 80)
+    duplicate_alias = server.analyze_portfolio_risk({"510300": 50.0, "沪深300": 50.0}, 80)
+
+    assert bad_total["error"]["code"] == "invalid_weights"
+    assert duplicate_alias["error"]["code"] == "invalid_weights"
