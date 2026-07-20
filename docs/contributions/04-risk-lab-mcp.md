@@ -153,6 +153,8 @@ method
 
 ## 7. 真实验证记录
 
+### 7.1 自动化全量验证
+
 已执行：
 
 ```powershell
@@ -174,6 +176,37 @@ method
 - finance MCP：真实 stdio 连接成功，发现 6 个工具；
 - 模型预检：本机未配置提交所需的模型环境变量，因此按项目规则跳过，不影响金融核心和 MCP 验证。
 
+### 7.2 4号成员手工复核
+
+2026-07-20，4号成员在独立 PowerShell 终端中亲自执行以下步骤，不依赖开发代理代跑：
+
+```powershell
+cd E:\dingtalk\workspace\项目\financial-advisor-agent
+git switch feat/risk-lab-mcp
+git status --short --branch
+./.venv/Scripts/python.exe --version
+./.venv/Scripts/pytest.exe `
+  tests/test_portfolio_risk.py `
+  tests/test_profile.py `
+  tests/test_mcp_tools.py `
+  tests/test_mcp_protocol.py -q
+./scripts/preflight.ps1
+```
+
+手工复核结果：
+
+- 当前分支：`feat/risk-lab-mcp`；
+- 工作区：干净，无未提交文件；
+- Python：3.11.9；
+- 风险相关定向测试：34 项通过，`100%`；
+- finance MCP：真实 stdio 连接成功，用时约 3297ms；
+- 工具发现：6 个，包含 `analyze_portfolio_risk`；
+- 最终状态：`Preflight passed`。
+
+终端中的 `Hermes source checkout is not initialized` 是非阻断警告：本地没有完整上游源码副本，但官方 0.18.2 release wheel 和固定 gitlink SHA 已通过校验。`Primary relay preflight skipped` 表示未配置大模型环境变量，只跳过模型调用，不影响4号风险核心与 MCP 验收。
+
+### 7.3 四资产 fixture 冒烟
+
 四资产 fixture 冒烟结果：
 
 | 项目 | 结果 |
@@ -185,6 +218,8 @@ method
 | 最大回撤 | -3.2517% |
 
 这些数字来自合成 fixture，只用于验证算法和离线演示，不是真实行情结论。
+
+### 7.4 独立公式复算
 
 另外使用 Pandas 独立复算同一组四资产数据，未调用本模块的中间计算函数。对比结果如下：
 
