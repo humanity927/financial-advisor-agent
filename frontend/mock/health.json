@@ -1,0 +1,20 @@
+{
+  "ok": true,
+  "data": {
+    "status": "healthy",
+    "akshare_installed": true,
+    "cache_directory": "E:/FinalProject/financial-advisor-agent/.runtime/cache",
+    "cache_writable": true,
+    "fixture_path": "E:/FinalProject/financial-advisor-agent/data/fixtures/market_data.json",
+    "fixture_available": true,
+    "force_fixture": true,
+    "supported_symbol_count": 4
+  },
+  "meta": {
+    "source": "system",
+    "as_of": "2026-07-20T19:00:00+08:00",
+    "request_id": "mock-001",
+    "is_fallback": false
+  },
+  "warnings": []
+}
