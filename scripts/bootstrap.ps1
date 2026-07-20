@@ -43,21 +43,22 @@ try {
     & $VenvPython -m pip config --site set global.timeout 120
     Invoke-PipInstall @("--upgrade", "pip", "setuptools>=77,<83", "wheel")
 
-    $UseVendorHermes = Test-Path (Join-Path $HermesPath "pyproject.toml")
-    if (-not $UseVendorHermes -and -not $SkipSubmoduleNetwork) {
+    $HasVendorHermes = Test-Path (Join-Path $HermesPath "pyproject.toml")
+    if (-not $HasVendorHermes -and -not $SkipSubmoduleNetwork) {
         & git submodule update --init --depth 1 vendor/hermes-agent
-        $UseVendorHermes = $LASTEXITCODE -eq 0 -and (Test-Path (Join-Path $HermesPath "pyproject.toml"))
-        if (-not $UseVendorHermes) {
-            Write-Warning "GitHub submodule 初始化失败，将安装国内 PyPI 上的官方 hermes-agent==0.18.2"
+        $HasVendorHermes = $LASTEXITCODE -eq 0 -and (Test-Path (Join-Path $HermesPath "pyproject.toml"))
+        if (-not $HasVendorHermes) {
+            Write-Warning "GitHub submodule 初始化失败；将仅校验 gitlink 中的固定提交"
         }
     }
-    if ($UseVendorHermes) {
+    if ($HasVendorHermes) {
         & git -C $HermesPath checkout --detach $ExpectedSha
         if ($LASTEXITCODE -ne 0) { throw "无法检出固定 Hermes 提交" }
-        Invoke-PipInstall @("${HermesPath}[mcp,web]")
-    } else {
-        Invoke-PipInstall @("hermes-agent[mcp,web]==0.18.2")
     }
+
+    # The tagged source tree excludes generated Dashboard assets; the official
+    # release wheel includes them and remains independently pinned to 0.18.2.
+    Invoke-PipInstall @("--only-binary=hermes-agent", "hermes-agent[mcp,web]==0.18.2")
     Invoke-PipInstall @("-e", "${Root}[dev]")
 
     $RuntimeHome = Join-Path $Root ".runtime\hermes"

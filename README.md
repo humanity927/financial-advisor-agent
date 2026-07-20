@@ -16,20 +16,20 @@ Hermes Dashboard
         -> rule-based allocation
 ```
 
-Hermes 固定在 `v2026.7.7.2` / `9de9c25f620ff7f1ce0fd5457d596052d5159596`，位于 `vendor/hermes-agent`。业务代码不会修改或 import Hermes 私有模块。
+Hermes 固定在 `v2026.7.7.2` / `9de9c25f620ff7f1ce0fd5457d596052d5159596`，位于 `vendor/hermes-agent` 并用于上游源码审计。运行时安装相同版本的官方发布 wheel，因为固定提交不追踪 Dashboard 的预构建资源。业务代码不会修改或 import Hermes 私有模块。
 
 ## Windows 快速开始
 
-环境要求：PowerShell、Git、Python 3.11，以及能够访问 GitHub 或已初始化的 submodule。
+环境要求：PowerShell、Git 和 Python 3.11。建议能够访问 GitHub，以便初始化用于审计的 submodule。
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
 ./scripts/bootstrap.ps1
 ```
 
-安装脚本会创建 `.venv`，在该 venv 内配置清华 PyPI 源，失败时单次改用阿里云源。脚本以非 editable 方式安装 Hermes，以 editable 方式安装本项目。
+安装脚本会创建 `.venv`，在该 venv 内配置清华 PyPI 源，失败时单次改用阿里云源。脚本只接受官方 `hermes-agent==0.18.2` 发布 wheel，并以 editable 方式安装本项目。
 
-如果 GitHub Git 通道在下载中持续断开，可使用下面的可复现回退。仓库仍保留相同 SHA 的 submodule gitlink，Hermes 则从国内 PyPI 安装严格固定的官方 `0.18.2` 包：
+如果 GitHub Git 通道在下载中持续断开，可跳过 submodule 网络初始化。仓库仍保留相同 SHA 的 gitlink，运行时安装方式不变：
 
 ```powershell
 ./scripts/bootstrap.ps1 -SkipSubmoduleNetwork
