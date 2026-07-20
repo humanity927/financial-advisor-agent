@@ -90,7 +90,10 @@ def validate_portfolio_weights(
 
     normalized: dict[str, float] = {}
     for symbol in symbol_order or tuple(weights_pct):
-        value = float(weights_pct[symbol])
+        raw_value = weights_pct[symbol]
+        if isinstance(raw_value, bool):
+            raise PortfolioValidationError("所有权重必须是非负有限数值")
+        value = float(raw_value)
         if not math.isfinite(value) or value < 0:
             raise PortfolioValidationError("所有权重必须是非负有限数值")
         normalized[symbol] = value
@@ -156,8 +159,8 @@ def calculate_portfolio_risk(
 ) -> PortfolioRiskAnalysis:
     """Calculate historical risk for a daily-rebalanced, fixed-weight portfolio."""
     symbols, validated_weights = _validated_weights(series, weights_pct)
-    if min_observations < 2:
-        raise PortfolioValidationError("min_observations至少为2")
+    if min_observations < 3:
+        raise PortfolioValidationError("min_observations至少为3")
 
     closes = {item.symbol: _valid_closes(item) for item in series}
     date_sets = [set(closes[symbol]) for symbol in symbols]

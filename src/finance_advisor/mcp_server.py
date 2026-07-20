@@ -318,32 +318,11 @@ def analyze_portfolio_risk(
 
     try:
         loaded = [get_market_service().get_history(symbol, lookback_days) for symbol in symbols]
-        analysis = calculate_portfolio_risk(loaded, normalized_weights)
-    except InsufficientCommonDataError as exc:
-        return success_response(
-            {
-                "portfolio": None,
-                "assets": [
-                    {
-                        "symbol": symbol.symbol,
-                        "name": symbol.name,
-                        "asset_class": symbol.asset_class,
-                        "weight_pct": normalized_weights[symbol.symbol],
-                    }
-                    for symbol in symbols
-                ],
-                "method": "历史数据统计，不代表未来表现",
-            },
-            warnings=[str(exc)],
-            request_id=request_id,
-        )
-    except PortfolioValidationError as exc:
-        return error_response("invalid_weights", str(exc), request_id=request_id)
     except Exception:
-        LOGGER.exception("portfolio risk analysis failed request_id=%s", request_id)
+        LOGGER.exception("portfolio history loading failed request_id=%s", request_id)
         return error_response(
             "portfolio_risk_failed",
-            "组合风险计算失败，请检查历史数据和权重",
+            "组合历史数据加载失败，请检查行情服务",
             retryable=True,
             request_id=request_id,
         )
@@ -359,6 +338,35 @@ def analyze_portfolio_risk(
         }
         for symbol, item in zip(symbols, loaded, strict=True)
     ]
+    bar_dates = [bar.date.isoformat() for item in loaded for bar in item.bars]
+    as_of = max(bar_dates) if bar_dates else max(item.fetched_at for item in loaded)
+
+    try:
+        analysis = calculate_portfolio_risk(loaded, normalized_weights)
+    except InsufficientCommonDataError as exc:
+        return success_response(
+            {
+                "portfolio": None,
+                "assets": assets,
+                "method": "历史数据统计，不代表未来表现",
+            },
+            source=_source_for(loaded),
+            as_of=as_of,
+            is_fallback=any(item.is_fallback for item in loaded),
+            warnings=list(dict.fromkeys(_warnings_for(loaded) + [str(exc)])),
+            request_id=request_id,
+        )
+    except PortfolioValidationError as exc:
+        return error_response("invalid_weights", str(exc), request_id=request_id)
+    except Exception:
+        LOGGER.exception("portfolio risk calculation failed request_id=%s", request_id)
+        return error_response(
+            "portfolio_risk_failed",
+            "组合风险计算失败，请检查历史数据和权重",
+            retryable=True,
+            request_id=request_id,
+        )
+
     return success_response(
         {
             "portfolio": analysis.as_dict(),

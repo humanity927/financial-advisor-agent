@@ -77,6 +77,7 @@ def test_common_dates_weights_correlation_and_drawdown_are_reproducible() -> Non
         {"510300": 90.0},
         {"510300": -10.0, "511010": 110.0},
         {"510300": float("nan"), "511010": 100.0},
+        {"510300": True, "511010": 99.0},
     ],
 )
 def test_invalid_weights_are_rejected(weights: dict[str, float]) -> None:
@@ -94,6 +95,13 @@ def test_insufficient_common_dates_are_explicit() -> None:
 
     with pytest.raises(InsufficientCommonDataError, match="共同有效收盘价只有30条"):
         calculate_portfolio_risk([left, right], {"510300": 50.0, "511010": 50.0})
+
+
+def test_minimum_observation_override_must_support_statistics() -> None:
+    series = _series("510300", [100.0, 101.0, 102.0])
+
+    with pytest.raises(PortfolioValidationError, match="至少为3"):
+        calculate_portfolio_risk([series], {"510300": 100.0}, min_observations=2)
 
 
 def test_constant_asset_marks_cross_correlation_unavailable() -> None:

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from datetime import date, timedelta
 from pathlib import Path
 
 import finance_advisor.mcp_server as server
 from finance_advisor.market.akshare_provider import AkshareProvider
 from finance_advisor.market.cache_provider import CacheProvider
 from finance_advisor.market.fixture_provider import FixtureProvider
+from finance_advisor.market.models import MarketBar, MarketSeries
 from finance_advisor.market.service import MarketService
+from finance_advisor.market.symbols import SymbolInfo
 
 
 def _fixture_service(tmp_path: Path) -> MarketService:
@@ -42,6 +45,8 @@ def test_profile_and_allocation_tools() -> None:
     allocation = server.build_allocation(**values)
 
     assert profile["data"]["risk_level"] == "稳健型"
+    assert len(profile["data"]["dimensions"]) == 6
+    assert sum(item["max_score"] for item in profile["data"]["dimensions"]) == 100
     assert allocation["data"]["effective_risk_level"] == "稳健型"
     assert sum(allocation["data"]["allocation_pct"].values()) == 100.0
 
@@ -83,3 +88,79 @@ def test_invalid_portfolio_weights_are_structured_errors() -> None:
 
     assert bad_total["error"]["code"] == "invalid_weights"
     assert duplicate_alias["error"]["code"] == "invalid_weights"
+
+
+def test_portfolio_insufficient_data_keeps_source_metadata(
+    monkeypatch: object,
+) -> None:
+    start = date(2025, 1, 1)
+
+    class PartialHistoryService:
+        def get_history(self, symbol: SymbolInfo, _lookback_days: int) -> MarketSeries:
+            symbol_value = symbol.symbol
+            offset = 0 if symbol_value == "510300" else 40
+            return MarketSeries(
+                symbol=symbol_value,
+                name=symbol_value,
+                asset_class="测试",
+                bars=[
+                    MarketBar(
+                        date=start + timedelta(days=offset + index),
+                        close=100 + index,
+                    )
+                    for index in range(70)
+                ],
+                source="fixture",
+                fetched_at="2026-07-20T00:00:00+08:00",
+                is_fallback=True,
+                warning="演示数据/非实时数据",
+            )
+
+    monkeypatch.setattr(server, "_market_service", PartialHistoryService())  # type: ignore[attr-defined]
+
+    result = server.analyze_portfolio_risk({"510300": 50.0, "511010": 50.0}, 80)
+
+    assert result["ok"] is True
+    assert result["data"]["portfolio"] is None
+    assert result["meta"]["source"] == "fixture"
+    assert result["meta"]["is_fallback"] is True
+    assert any("共同有效收盘价" in warning for warning in result["warnings"])
+
+
+def test_portfolio_empty_series_uses_fetch_time_for_metadata(
+    monkeypatch: object,
+) -> None:
+    class EmptyHistoryService:
+        def get_history(self, symbol: SymbolInfo, _lookback_days: int) -> MarketSeries:
+            return MarketSeries(
+                symbol=symbol.symbol,
+                name=symbol.name,
+                asset_class=symbol.asset_class,
+                bars=[],
+                source="fixture",
+                fetched_at="2026-07-20T12:00:00+08:00",
+                is_fallback=True,
+                warning="演示数据/非实时数据",
+            )
+
+    monkeypatch.setattr(server, "_market_service", EmptyHistoryService())  # type: ignore[attr-defined]
+
+    result = server.analyze_portfolio_risk({"510300": 100.0}, 80)
+
+    assert result["ok"] is True
+    assert result["data"]["portfolio"] is None
+    assert result["meta"]["as_of"] == "2026-07-20T12:00:00+08:00"
+
+
+def test_portfolio_history_failure_is_retryable(monkeypatch: object) -> None:
+    class FailingHistoryService:
+        def get_history(self, _symbol: SymbolInfo, _lookback_days: int) -> MarketSeries:
+            raise RuntimeError("offline")
+
+    monkeypatch.setattr(server, "_market_service", FailingHistoryService())  # type: ignore[attr-defined]
+
+    result = server.analyze_portfolio_risk({"510300": 100.0}, 80)
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "portfolio_risk_failed"
+    assert result["error"]["retryable"] is True
