@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=77,<83"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "finance-advisor-mcp"
+version = "0.1.0"
+description = "Read-only financial consultation MCP tools for Hermes Agent"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "akshare==1.18.64",
+  "httpx==0.28.1",
+  "mcp==1.26.0",
+  "numpy==2.4.3",
+  "pandas==3.0.3",
+  "pydantic==2.13.4",
+  "python-dotenv==1.2.2",
+  "PyYAML==6.0.3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy==2.3.0",
+  "pytest==9.1.1",
+  "pytest-cov==7.0.0",
+  "respx==0.23.1",
+  "ruff==0.15.22",
+]
+
+[project.scripts]
+finance-mcp = "finance_advisor.mcp_server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+exclude = ["vendor"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+packages = ["finance_advisor"]
+mypy_path = "src"
+exclude = ["vendor"]
+
+[[tool.mypy.overrides]]
+module = ["akshare", "akshare.*", "pandas", "pandas.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+  "integration: starts a real local MCP subprocess",
+]
+
+[tool.coverage.run]
+source = ["finance_advisor"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+skip_covered = true

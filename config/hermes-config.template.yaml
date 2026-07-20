@@ -1,0 +1,49 @@
+_config_version: 33
+
+custom_providers:
+  - name: relay
+    base_url: "__RELAY_BASE_URL__"
+    key_env: RELAY_API_KEY
+    api_mode: chat_completions
+
+model:
+  provider: custom:relay
+  default: "__RELAY_MODEL_ID__"
+  context_length: 128000
+
+agent:
+  api_max_retries: 0
+
+fallback_providers:
+  - provider: deepseek
+    model: deepseek-chat
+
+mcp_servers:
+  finance:
+    command: "__PYTHON_EXE__"
+    args: ["-m", "finance_advisor.mcp_server"]
+    env:
+      FINANCE_PROJECT_ROOT: "__PROJECT_ROOT__"
+      FINANCE_CACHE_DIR: "__CACHE_DIR__"
+      FINANCE_FIXTURE_PATH: "__FIXTURE_PATH__"
+      FINANCE_FORCE_FIXTURE: "__FORCE_FIXTURE__"
+    connect_timeout: 15
+    timeout: 30
+    supports_parallel_tool_calls: true
+    tools:
+      include:
+        - finance_health
+        - get_market_snapshot
+        - assess_investor_profile
+        - analyze_asset_risk
+        - build_allocation
+      resources: false
+      prompts: false
+
+display:
+  tool_progress: all
+  streaming: true
+  show_reasoning: false
+
+privacy:
+  redact_pii: true

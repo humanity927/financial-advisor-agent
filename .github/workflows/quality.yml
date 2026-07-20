@@ -1,0 +1,28 @@
+name: quality
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  windows-python311:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Bootstrap
+        shell: pwsh
+        run: ./scripts/bootstrap.ps1
+      - name: Quality checks
+        shell: pwsh
+        run: |
+          ./.venv/Scripts/ruff.exe format --check .
+          ./.venv/Scripts/ruff.exe check .
+          ./.venv/Scripts/mypy.exe src
+          ./.venv/Scripts/pytest.exe --cov=finance_advisor --cov-fail-under=85
+          ./scripts/verify-hermes.ps1
