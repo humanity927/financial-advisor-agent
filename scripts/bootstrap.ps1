@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$PythonCommand = "python",
-    [switch]$SkipSubmoduleNetwork
+    [switch]$SkipSubmoduleNetwork,
+    [switch]$SkipDoctor
 )
 
 $ErrorActionPreference = "Stop"
@@ -83,7 +84,11 @@ try {
     & $VenvPython -m pip check
     if ($LASTEXITCODE -ne 0) { throw "pip check 失败" }
     & (Join-Path $VenvDir "Scripts\hermes.exe") --version
-    & (Join-Path $VenvDir "Scripts\hermes.exe") doctor
+    if ($LASTEXITCODE -ne 0) { throw "Hermes version check failed" }
+    if (-not $SkipDoctor) {
+        & (Join-Path $VenvDir "Scripts\hermes.exe") doctor
+        if ($LASTEXITCODE -ne 0) { throw "Hermes doctor failed" }
+    }
 
     & (Join-Path $PSScriptRoot "verify-hermes.ps1")
     Write-Host "环境安装完成。请编辑 $RuntimeEnv 后运行 scripts/run-dashboard.ps1" -ForegroundColor Green

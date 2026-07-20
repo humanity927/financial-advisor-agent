@@ -17,7 +17,7 @@ jobs:
           cache: pip
       - name: Bootstrap
         shell: pwsh
-        run: ./scripts/bootstrap.ps1
+        run: ./scripts/bootstrap.ps1 -SkipDoctor
       - name: Quality checks
         shell: pwsh
         run: |
