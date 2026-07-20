@@ -1,0 +1,23 @@
+.shell {
+  min-height: 100vh;
+}
+
+.shell .ant-layout-sider {
+  position: fixed !important;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 100;
+}
+
+.shell .ant-layout-sider ~ .ant-layout {
+  margin-left: var(--sidebar-width);
+}
+
+.shell-content {
+  margin-top: var(--topbar-height);
+  padding: var(--space-lg);
+  min-height: calc(100vh - var(--topbar-height));
+  overflow-y: auto;
+  background: var(--color-bg);
+}
