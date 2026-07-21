@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from finance_advisor.market.akshare_provider import AkshareProvider
@@ -8,6 +10,7 @@ from finance_advisor.market.cache_provider import CacheProvider
 from finance_advisor.market.fixture_provider import FixtureProvider
 from finance_advisor.market.models import MarketSeries
 from finance_advisor.market.service import MarketService
+from finance_advisor.market.symbols import SymbolInfo
 
 PROJECT_ROOT = Path(
     os.getenv("FINANCE_PROJECT_ROOT", Path(__file__).resolve().parents[3])
@@ -23,15 +26,21 @@ FIXTURE_PATH = Path(
 _market_service: MarketService | None = None
 
 
+def get_cache_dir() -> Path:
+    return Path(os.getenv("FINANCE_CACHE_DIR", CACHE_DIR)).resolve()
+
+
+def get_fixture_path() -> Path:
+    return Path(os.getenv("FINANCE_FIXTURE_PATH", FIXTURE_PATH)).resolve()
+
+
 def get_market_service() -> MarketService:
     global _market_service
     if _market_service is None:
-        cache_dir = Path(os.getenv("FINANCE_CACHE_DIR", CACHE_DIR))
-        fixture_path = Path(os.getenv("FINANCE_FIXTURE_PATH", FIXTURE_PATH))
         _market_service = MarketService(
             AkshareProvider(timeout_seconds=8.0, max_retries=2),
-            CacheProvider(cache_dir),
-            FixtureProvider(fixture_path),
+            CacheProvider(get_cache_dir()),
+            FixtureProvider(get_fixture_path()),
         )
     return _market_service
 
@@ -39,6 +48,20 @@ def get_market_service() -> MarketService:
 def reset_market_service_for_tests() -> None:
     global _market_service
     _market_service = None
+
+
+def load_market_series(
+    symbols: Sequence[SymbolInfo],
+    loader: Callable[[SymbolInfo], MarketSeries],
+) -> list[MarketSeries]:
+    """Load independent read-only symbols concurrently while preserving input order."""
+    if not symbols:
+        return []
+    with ThreadPoolExecutor(
+        max_workers=min(4, len(symbols)),
+        thread_name_prefix="market-data",
+    ) as executor:
+        return list(executor.map(loader, symbols))
 
 
 def source_for(series: list[MarketSeries]) -> str:

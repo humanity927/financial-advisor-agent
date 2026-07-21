@@ -29,6 +29,11 @@ def test_health_uses_unified_envelope(client: TestClient) -> None:
     assert payload["data"]["status"] == "healthy"
     assert payload["meta"]["source"] == "system"
     assert payload["data"]["fixture_available"] is True
+    assert payload["data"]["force_fixture"] is True
+    assert payload["data"]["supported_symbol_count"] == 4
+    assert payload["data"]["cache_writable"] is True
+    assert isinstance(payload["data"]["akshare_installed"], bool)
+    assert Path(payload["data"]["cache_directory"]).is_dir()
 
 
 def test_spa_fallback_does_not_intercept_unknown_api(client: TestClient) -> None:

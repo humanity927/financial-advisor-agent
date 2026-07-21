@@ -16,7 +16,16 @@ import {
   Typography,
 } from 'antd';
 import type { TableColumnsType } from 'antd';
-import { CalendarRange, CircleOff, ListChecks, RefreshCw } from 'lucide-react';
+import {
+  CalendarRange,
+  CircleOff,
+  Clock3,
+  Database,
+  Layers3,
+  LineChart,
+  ListChecks,
+  RefreshCw,
+} from 'lucide-react';
 import SectionHeader from '../../components/SectionHeader';
 import PageState from '../../components/PageState';
 import SourceStamp from '../../components/SourceStamp';
@@ -31,6 +40,7 @@ import type {
   MarketReturnWindow,
   MarketSourceDetail,
 } from './types';
+import './MarketPage.css';
 
 const SUPPORTED_SYMBOLS = [
   { label: '沪深300ETF', value: '510300', assetClass: '股票' },
@@ -46,7 +56,7 @@ const RANGE_OPTIONS = [
   { label: '近1年', value: '1Y' },
 ];
 const RETURN_WINDOWS: MarketReturnWindow[] = ['20d', '60d', '252d'];
-const CHART_COLORS = ['#2B7BD6', '#D4883A', '#52C41A', '#FA8C16'];
+const CHART_COLORS = ['#2563EB', '#C58A13', '#168A5B', '#A855A0'];
 
 interface MarketTableRow extends MarketSnapshot {
   returns?: MarketIntervalReturn['returns'];
@@ -61,6 +71,11 @@ function renderReturn(value: number | null | undefined) {
 
 function uniqueWarnings(...groups: Array<string[] | undefined>) {
   return Array.from(new Set(groups.flatMap((group) => group ?? [])));
+}
+
+function formatTimestamp(value: string) {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString('zh-CN', { hour12: false });
 }
 
 export default function MarketPage() {
@@ -117,22 +132,26 @@ export default function MarketPage() {
       legend: {
         top: 0,
         type: 'scroll',
+        icon: 'roundRect',
       },
       grid: {
-        top: 48,
-        left: 48,
-        right: 24,
-        bottom: 40,
+        top: 52,
+        left: 56,
+        right: 28,
+        bottom: 44,
       },
       xAxis: {
         type: 'category',
         boundaryGap: false,
         data: dates,
+        axisLabel: { hideOverlap: true },
+        axisLine: { lineStyle: { color: '#CBD5E1' } },
       },
       yAxis: {
         type: 'value',
-        name: '归一化',
+        name: '基准 = 100',
         scale: true,
+        splitLine: { lineStyle: { color: '#E8EDF2', type: 'dashed' } },
       },
       aria: {
         enabled: true,
@@ -145,6 +164,8 @@ export default function MarketPage() {
         type: 'line',
         smooth: true,
         showSymbol: false,
+        sampling: 'lttb',
+        lineStyle: { width: 2.2 },
         emphasis: { focus: 'series' },
         data: item.points.map((point) => point.normalized),
       })),
@@ -154,7 +175,13 @@ export default function MarketPage() {
   const snapshotColumns: TableColumnsType<MarketTableRow> = [
     { title: '代码', dataIndex: 'symbol', key: 'symbol', width: 92 },
     { title: '名称', dataIndex: 'name', key: 'name', width: 128 },
-    { title: '资产', dataIndex: 'asset_class', key: 'asset_class', width: 90 },
+    {
+      title: '资产',
+      dataIndex: 'asset_class',
+      key: 'asset_class',
+      width: 90,
+      render: (value: string) => <Tag>{value}</Tag>,
+    },
     {
       title: '最新价',
       dataIndex: 'latest_price',
@@ -202,7 +229,13 @@ export default function MarketPage() {
         <SourceStamp source={source} isFallback={row.is_fallback} />
       ),
     },
-    { title: '获取时间', dataIndex: 'fetched_at', key: 'fetched_at', width: 220 },
+    {
+      title: '获取时间',
+      dataIndex: 'fetched_at',
+      key: 'fetched_at',
+      width: 190,
+      render: (value: string) => formatTimestamp(value),
+    },
     {
       title: '说明',
       dataIndex: 'warning',
@@ -218,7 +251,7 @@ export default function MarketPage() {
   const hasData = Boolean(comparison?.normalized_series.length);
 
   return (
-    <div>
+    <div className="market-page">
       <SectionHeader
         title="行情对比"
         subtitle="白名单 ETF 的归一化走势、区间收益和数据来源核验"
@@ -237,40 +270,15 @@ export default function MarketPage() {
 
       <Row gutter={[24, 24]}>
         <Col span={24}>
-          <Card>
-            <Space size="large" wrap style={{ width: '100%', justifyContent: 'space-between' }}>
-              <Space direction="vertical" size={8}>
-                <Typography.Text strong>
-                  <CalendarRange size={15} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />
-                  对比区间
+          <Card className="market-control-card">
+            <div className="market-control-heading">
+              <div>
+                <Typography.Title level={5}>对比范围</Typography.Title>
+                <Typography.Text type="secondary">
+                  已选 {selectedSymbols.length} / {SUPPORTED_SYMBOLS.length} 个标的
                 </Typography.Text>
-                <Segmented
-                  options={RANGE_OPTIONS}
-                  value={range}
-                  onChange={(value) => setRange(value as MarketRange)}
-                />
-              </Space>
-
-              <Space direction="vertical" size={8} style={{ minWidth: 420 }}>
-                <Typography.Text strong>关注标的</Typography.Text>
-                <Checkbox.Group
-                  options={SUPPORTED_SYMBOLS.map((item) => ({
-                    label: `${item.label} ${item.value}`,
-                    value: item.value,
-                  }))}
-                  value={selectedSymbols}
-                  onChange={(values) => setSelectedSymbols(values.map(String))}
-                />
-                <Space wrap>
-                  {SUPPORTED_SYMBOLS.map((item) => (
-                    <Tag key={item.value} color="blue">
-                      {item.value} · {item.assetClass}
-                    </Tag>
-                  ))}
-                </Space>
-              </Space>
-
-              <Space>
+              </div>
+              <Space wrap>
                 <Button
                   icon={<ListChecks size={14} />}
                   onClick={() => setSelectedSymbols(DEFAULT_SYMBOLS)}
@@ -286,7 +294,43 @@ export default function MarketPage() {
                   清空
                 </Button>
               </Space>
-            </Space>
+            </div>
+
+            <div className="market-filter-grid">
+              <div className="market-filter-block">
+                <Typography.Text strong className="market-filter-label">
+                  <CalendarRange size={16} />
+                  观察区间
+                </Typography.Text>
+                <Segmented
+                  block
+                  options={RANGE_OPTIONS}
+                  value={range}
+                  onChange={(value) => setRange(value as MarketRange)}
+                />
+              </div>
+
+              <div className="market-filter-block market-symbol-block">
+                <Typography.Text strong className="market-filter-label">
+                  <Layers3 size={16} />
+                  白名单 ETF
+                </Typography.Text>
+                <Checkbox.Group
+                  className="market-symbol-grid"
+                  value={selectedSymbols}
+                  onChange={(values) => setSelectedSymbols(values.map(String))}
+                >
+                  {SUPPORTED_SYMBOLS.map((item) => (
+                    <Checkbox className="market-symbol-option" value={item.value} key={item.value}>
+                      <span className="market-symbol-copy">
+                        <strong>{item.label}</strong>
+                        <span>{item.value} · {item.assetClass}</span>
+                      </span>
+                    </Checkbox>
+                  ))}
+                </Checkbox.Group>
+              </div>
+            </div>
 
             {selectedSymbols.length === 0 && (
               <Alert
@@ -294,7 +338,7 @@ export default function MarketPage() {
                 showIcon
                 message="请至少选择一个白名单标的"
                 description="当前行情接口只支持 510300、511010、518880、511880。"
-                style={{ marginTop: 16 }}
+                className="market-selection-warning"
               />
             )}
           </Card>
@@ -340,7 +384,7 @@ export default function MarketPage() {
                   showIcon
                   message="演示数据 / 非实时行情"
                   description={warnings.length > 0 ? warnings.join('；') : '当前返回数据来自 fixture 或回退源。'}
-                  style={{ marginBottom: 16 }}
+                  className="market-data-alert"
                 />
               )}
               {!isFixture && warnings.length > 0 && (
@@ -349,15 +393,47 @@ export default function MarketPage() {
                   showIcon
                   message="数据提示"
                   description={warnings.join('；')}
-                  style={{ marginBottom: 16 }}
+                  className="market-data-alert"
                 />
               )}
-              <Card title="归一化走势" extra={<SourceStamp source={compareQuery.data.meta.source} isFallback={compareQuery.data.meta.is_fallback} />}>
+              <Card
+                className="market-chart-card"
+                title={
+                  <span className="market-card-title">
+                    <LineChart size={18} />
+                    归一化走势
+                  </span>
+                }
+                extra={
+                  <SourceStamp
+                    source={compareQuery.data.meta.source}
+                    isFallback={compareQuery.data.meta.is_fallback}
+                  />
+                }
+              >
+                <div className="market-summary-strip">
+                  <div>
+                    <Layers3 size={17} />
+                    <span>对比标的</span>
+                    <strong>{comparison.symbols.length}</strong>
+                  </div>
+                  <div>
+                    <Database size={17} />
+                    <span>共同交易日</span>
+                    <strong>{comparison.observation_count}</strong>
+                  </div>
+                  <div>
+                    <Clock3 size={17} />
+                    <span>数据截至</span>
+                    <strong>{comparison.latest_trade_date ?? '暂无'}</strong>
+                  </div>
+                </div>
                 <ReactECharts
                   option={chartOption}
                   notMerge
                   lazyUpdate
-                  style={{ height: 340, width: '100%' }}
+                  className="market-chart"
+                  style={{ height: 360, width: '100%' }}
                   data-testid="market-compare-chart"
                 />
               </Card>

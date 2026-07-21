@@ -77,16 +77,17 @@ FINANCE_FORCE_FIXTURE=0
 ./scripts/run-app.ps1 -ForceFixture
 ```
 
-浏览器地址：[http://127.0.0.1:8123](http://127.0.0.1:8123)。当前仓库尚未包含二号前端壳时，根路径会显示后端启动页；前端构建进入 `frontend/dist` 后，同一入口会托管 SPA，且不会把 `/api/*` fallback 成前端页面。
+浏览器地址：[http://127.0.0.1:8123](http://127.0.0.1:8123)。脚本默认先重建 `frontend/dist`，随后由 FastAPI 在同一端口托管 SPA；只有明确传入 `-SkipFrontendBuild` 才会复用已有构建。`/api/*` 不会被 fallback 成前端页面，行情页位于 `/market`。
 
 核心端点：
 
 ```text
 GET  /api/health
+GET  /api/market/snapshot?symbols=510300,511010,518880,511880
 POST /api/market/compare
 ```
 
-`POST /api/market/compare` 支持 1 到 4 个白名单 ETF，`range` 可选 `1M`、`3M`、`1Y`，返回共同交易日对齐后的归一化曲线、20/60/252 交易日收益、行情快照、数据来源、时间和 fallback warning。该端点使用确定性服务，不注册为 MCP 工具。
+行情端点支持 1 到 4 个白名单 ETF。快照接口供总览页使用；`POST /api/market/compare` 的 `range` 可选 `1M`、`3M`、`1Y`，返回共同交易日对齐后的归一化曲线、20/60/252 交易日收益、行情快照、数据来源、时间和 fallback warning。多标的读取采用最多 4 路受控并发，端点使用确定性服务，不注册为 MCP 工具。
 
 ## 演示问题
 

@@ -43,8 +43,9 @@ async function waitForUrl(url, name) {
 
 async function startService(service) {
   if (await isReachable(service.url)) {
-    console.log(`Reusing ${service.name} at ${service.url}`);
-    return { ...service, external: true };
+    throw new Error(
+      `${service.name} address is already in use (${service.url}); stop the existing service before E2E`,
+    );
   }
 
   const child = spawn(service.command, service.args, {
@@ -62,7 +63,7 @@ async function startService(service) {
       throw new Error(`${service.name} exited before it became ready`);
     }
     if (await isReachable(service.url)) {
-      return { ...service, child, exited, external: false };
+      return { ...service, child, exited };
     }
     await delay(250);
   }
@@ -70,7 +71,7 @@ async function startService(service) {
 }
 
 async function stopService(running) {
-  if (running.external || !running.child) {
+  if (!running.child) {
     return;
   }
 
