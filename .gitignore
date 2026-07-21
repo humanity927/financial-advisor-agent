@@ -11,3 +11,6 @@ htmlcov/
 dist/
 build/
 .env
+
+# Local collaboration document, kept outside version control.
+金融理财咨询智能Agent_五人协作开发指南.md

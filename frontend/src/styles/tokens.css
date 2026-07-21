@@ -1,0 +1,39 @@
+:root {
+  /* 背景 & 表面 */
+  --color-bg:         #F4F6F7;
+  --color-surface:    #FFFFFF;
+  --color-border:     #D9E0E5;
+
+  /* 文字 */
+  --color-text-primary:   #17212B;
+  --color-text-secondary: #667085;
+
+  /* 涨跌（中国市场红涨绿跌） */
+  --color-up:     #CF1322;
+  --color-down:   #3F8600;
+
+  /* 品牌 */
+  --color-brand:  #1A5FB4;
+
+  /* 图表色板 */
+  --chart-color-1: #2B7BD6;
+  --chart-color-2: #D4883A;
+  --chart-color-3: #52C41A;
+  --chart-color-4: #FA8C16;
+
+  /* 间距 */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
+  /* 圆角 */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* 布局 */
+  --sidebar-width: 224px;
+  --topbar-height: 54px;
+}

@@ -1,0 +1,66 @@
+{
+  "ok": true,
+  "data": {
+    "snapshots": [
+      {
+        "symbol": "510300",
+        "name": "沪深300ETF",
+        "asset_class": "股票",
+        "latest_price": 4.183,
+        "previous_close": 4.164,
+        "daily_change_pct": 0.4563,
+        "trade_date": "2026-07-17",
+        "source": "fixture",
+        "origin_source": null,
+        "is_fallback": true,
+        "warning": "演示数据/非实时数据"
+      },
+      {
+        "symbol": "511010",
+        "name": "国债ETF",
+        "asset_class": "债券",
+        "latest_price": 103.3066,
+        "previous_close": 103.3377,
+        "daily_change_pct": -0.0301,
+        "trade_date": "2026-07-17",
+        "source": "fixture",
+        "origin_source": null,
+        "is_fallback": true,
+        "warning": "演示数据/非实时数据"
+      },
+      {
+        "symbol": "518880",
+        "name": "黄金ETF",
+        "asset_class": "黄金",
+        "latest_price": 5.5169,
+        "previous_close": 5.551,
+        "daily_change_pct": -0.6143,
+        "trade_date": "2026-07-17",
+        "source": "fixture",
+        "origin_source": null,
+        "is_fallback": true,
+        "warning": "演示数据/非实时数据"
+      },
+      {
+        "symbol": "511880",
+        "name": "货币ETF",
+        "asset_class": "现金管理",
+        "latest_price": 101.5765,
+        "previous_close": 101.5749,
+        "daily_change_pct": 0.0016,
+        "trade_date": "2026-07-17",
+        "source": "fixture",
+        "origin_source": null,
+        "is_fallback": true,
+        "warning": "演示数据/非实时数据"
+      }
+    ]
+  },
+  "meta": {
+    "source": "fixture",
+    "as_of": "2026-07-17",
+    "request_id": "mock-002",
+    "is_fallback": true
+  },
+  "warnings": ["演示数据/非实时数据"]
+}
