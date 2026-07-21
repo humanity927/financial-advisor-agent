@@ -74,9 +74,11 @@ interface ApiResponse<T> {
 | `/market` | 行情对比 | 3号 |
 | `/risk` | 风险实验室 | 4号 |
 | `/portfolio` | 配置规划 | 5号 |
-| `/advisor` | Agent 报告 | 2号后端、5号适配器 |
+| `/advisor` | Agent 报告 | 2号界面、5号后端 |
 
 注册在 `App.tsx`，新增页面请联系 2 号。
+
+Playwright E2E 会自动启动本地 fixture mock API（8123）和 Vite（5173），不依赖真实后端或外部网络。
 
 ## 测试
 

@@ -15,6 +15,7 @@ export default function TopBar() {
 
   return (
     <div
+      data-testid="system-topbar"
       style={{
         position: 'fixed',
         top: 0,
@@ -38,10 +39,10 @@ export default function TopBar() {
             color={data.data.force_fixture ? 'orange' : 'green'}
             icon={<Database size={14} />}
           >
-            {data.data.force_fixture ? '演示模式' : '实时模式'}
+            {data.data.force_fixture ? '演示模式' : '实时优先'}
           </Tag>
           <SourceStamp
-            source={data.data.fixture_available ? 'fixture' : 'system'}
+            source={data.data.force_fixture ? 'fixture' : 'system'}
           />
           <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
             <Wifi size={13} style={{ verticalAlign: 'text-bottom', marginRight: 4 }} />
@@ -50,9 +51,9 @@ export default function TopBar() {
         </>
       ) : (
         <>
-          <Tag color="orange" icon={<Clock size={14} />}>fixture 模式</Tag>
+          <Tag color="red" icon={<Clock size={14} />}>后端未连接</Tag>
           <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-            数据来源：演示数据
+            数据来源：未知
           </span>
           <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
             Agent 状态：未连接

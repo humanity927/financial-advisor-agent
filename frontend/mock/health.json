@@ -3,9 +3,9 @@
   "data": {
     "status": "healthy",
     "akshare_installed": true,
-    "cache_directory": "E:/FinalProject/financial-advisor-agent/.runtime/cache",
+    "cache_directory": ".runtime/cache",
     "cache_writable": true,
-    "fixture_path": "E:/FinalProject/financial-advisor-agent/data/fixtures/market_data.json",
+    "fixture_path": "data/fixtures/market_data.json",
     "fixture_available": true,
     "force_fixture": true,
     "supported_symbol_count": 4

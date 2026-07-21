@@ -28,14 +28,14 @@ async function request<T>(
   });
 
   if (!res.ok) {
-    // Try to parse error body, fallback to generic
+    let parsed: ApiResponse<unknown> | null = null;
     try {
-      const err = (await res.json()) as ApiResponse<unknown>;
-      if (!err.ok && err.error) {
-        throw new ApiClientError(err.error.code, err.error.message, err.error.retryable);
-      }
+      parsed = (await res.json()) as ApiResponse<unknown>;
     } catch {
-      // ignore parse failure
+      // The response may not contain JSON; use the stable HTTP fallback below.
+    }
+    if (parsed && !parsed.ok && parsed.error) {
+      throw new ApiClientError(parsed.error.code, parsed.error.message, parsed.error.retryable);
     }
     throw new ApiClientError(
       'http_error',
