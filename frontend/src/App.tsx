@@ -6,6 +6,7 @@ import AdvisorPage from './features/advisor/AdvisorPage';
 import PageState from './components/PageState';
 
 const MarketPage = lazy(() => import('./features/market/MarketPage'));
+const RiskPage = lazy(() => import('./features/risk/RiskPage'));
 
 const LazyPage = ({ title }: { title: string }) => (
   <div style={{ padding: 48, color: '#667085', textAlign: 'center' }}>
@@ -28,7 +29,14 @@ export default function App() {
               </Suspense>
             }
           />
-          <Route path="risk" element={<LazyPage title="风险实验室" />} />
+          <Route
+            path="risk"
+            element={
+              <Suspense fallback={<PageState state="loading" />}>
+                <RiskPage />
+              </Suspense>
+            }
+          />
           <Route path="portfolio" element={<LazyPage title="配置规划" />} />
           <Route path="advisor" element={<AdvisorPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -17,8 +17,15 @@ from finance_advisor.market.fixture_provider import FixtureProvider
 from finance_advisor.market.models import MarketSeries
 from finance_advisor.market.service import MarketService
 from finance_advisor.market.symbols import SymbolValidationError, normalize_symbols
-from finance_advisor.risk.metrics import InsufficientDataError, calculate_risk_metrics
-from finance_advisor.risk.profile import assess_profile
+from finance_advisor.risk.portfolio import PortfolioValidationError
+from finance_advisor.risk.service import (
+    InvalidLookbackError,
+    PortfolioWeight,
+    RiskDataUnavailableError,
+    build_asset_risk_report,
+    build_portfolio_risk_report,
+    profile_assessment_data,
+)
 from finance_advisor.schemas import (
     IncomeStability,
     InvestmentExperience,
@@ -181,8 +188,7 @@ def assess_investor_profile(
     )
     if isinstance(profile, dict):
         return profile
-    assessment = assess_profile(profile)
-    return success_response(assessment.model_dump(mode="json"))
+    return success_response(profile_assessment_data(profile))
 
 
 @mcp.tool()
@@ -192,73 +198,78 @@ def analyze_asset_risk(
 ) -> dict[str, Any]:
     """使用历史收盘价计算年化收益、波动率、最大回撤、95% VaR和CVaR；不预测未来。"""
     request_id = str(uuid4())
-    if lookback_days < 60 or lookback_days > 1260:
-        return error_response(
-            "invalid_lookback",
-            "lookback_days必须在60到1260之间",
-            request_id=request_id,
-        )
     try:
-        normalized = normalize_symbols(symbols)
+        report = build_asset_risk_report(get_market_service(), symbols, lookback_days)
+    except InvalidLookbackError as exc:
+        return error_response("invalid_lookback", str(exc), request_id=request_id)
     except SymbolValidationError as exc:
         return error_response("invalid_symbol", str(exc), request_id=request_id)
-
-    results: list[dict[str, Any]] = []
-    loaded: list[MarketSeries] = []
-    warnings: list[str] = []
-    for symbol in normalized:
-        try:
-            series = get_market_service().get_history(symbol, lookback_days)
-            loaded.append(series)
-            metrics = calculate_risk_metrics(series.bars)
-            results.append(
-                {
-                    "symbol": symbol.symbol,
-                    "name": symbol.name,
-                    "metrics": metrics.as_dict(),
-                    "source": series.source,
-                    "warning": series.warning,
-                }
-            )
-        except InsufficientDataError as exc:
-            warnings.append(str(exc))
-            results.append(
-                {
-                    "symbol": symbol.symbol,
-                    "name": symbol.name,
-                    "metrics": None,
-                    "error": "insufficient_data",
-                }
-            )
-        except Exception:
-            LOGGER.exception(
-                "risk analysis failed symbol=%s request_id=%s", symbol.symbol, request_id
-            )
-            warnings.append(f"{symbol.name}风险计算失败")
-            results.append(
-                {
-                    "symbol": symbol.symbol,
-                    "name": symbol.name,
-                    "metrics": None,
-                    "error": "analysis_failed",
-                }
-            )
-
-    if not loaded:
+    except RiskDataUnavailableError as exc:
         return error_response(
             "risk_analysis_failed",
-            "所有标的的历史数据均不可用",
-            data={"assets": results},
+            str(exc),
             retryable=True,
             request_id=request_id,
         )
-    as_of = max(item.bars[-1].date.isoformat() for item in loaded)
+    except Exception:
+        LOGGER.exception("risk analysis failed request_id=%s", request_id)
+        return error_response(
+            "risk_analysis_failed",
+            "风险分析失败，请检查历史数据和行情服务",
+            retryable=True,
+            request_id=request_id,
+        )
     return success_response(
-        {"assets": results, "method": "历史数据统计，不代表未来表现"},
-        source=_source_for(loaded),
-        as_of=as_of,
-        is_fallback=any(item.is_fallback for item in loaded),
-        warnings=list(dict.fromkeys(_warnings_for(loaded) + warnings)),
+        report.data,
+        source=report.source,
+        as_of=report.as_of,
+        is_fallback=report.is_fallback,
+        warnings=list(report.warnings),
+        request_id=request_id,
+    )
+
+
+@mcp.tool()
+def analyze_portfolio_risk(
+    weights_pct: dict[str, PortfolioWeight],
+    lookback_days: int = 252,
+) -> dict[str, Any]:
+    """计算1到4个白名单ETF固定权重组合的历史相关性、净值、回撤、VaR和CVaR。"""
+    request_id = str(uuid4())
+    try:
+        report = build_portfolio_risk_report(
+            get_market_service(),
+            weights_pct,
+            lookback_days,
+        )
+    except InvalidLookbackError as exc:
+        return error_response("invalid_lookback", str(exc), request_id=request_id)
+    except SymbolValidationError as exc:
+        return error_response("invalid_symbol", str(exc), request_id=request_id)
+    except PortfolioValidationError as exc:
+        return error_response("invalid_weights", str(exc), request_id=request_id)
+    except RiskDataUnavailableError as exc:
+        return error_response(
+            "portfolio_risk_failed",
+            str(exc),
+            retryable=True,
+            request_id=request_id,
+        )
+    except Exception:
+        LOGGER.exception("portfolio risk failed request_id=%s", request_id)
+        return error_response(
+            "portfolio_risk_failed",
+            "组合风险计算失败，请检查历史数据和权重",
+            retryable=True,
+            request_id=request_id,
+        )
+
+    return success_response(
+        report.data,
+        source=report.source,
+        as_of=report.as_of,
+        is_fallback=report.is_fallback,
+        warnings=list(report.warnings),
         request_id=request_id,
     )
 

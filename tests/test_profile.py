@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from finance_advisor.risk.profile import assess_profile, risk_level_for_score
+from finance_advisor.risk.profile import assess_profile, profile_chart_data, risk_level_for_score
 from finance_advisor.schemas import InvestorProfileInput
 
 
@@ -40,6 +40,11 @@ def test_stable_profile_score_and_limits() -> None:
     assert result.risk_level == "稳健型"
     assert result.hard_limits == []
     assert sum(result.score_breakdown.values()) == result.score
+
+    dimensions = profile_chart_data(result)
+    assert len(dimensions) == 6
+    assert sum(int(item["score"]) for item in dimensions) == result.score
+    assert sum(int(item["max_score"]) for item in dimensions) == 100
 
 
 def test_all_hard_limits_are_reported() -> None:

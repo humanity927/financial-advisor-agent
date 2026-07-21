@@ -11,7 +11,15 @@
       "流动性需求": 8,
       "应急资金": 5
     },
-    "hard_limits": []
+    "hard_limits": [],
+    "dimensions": [
+      { "dimension": "投资期限", "score": 8, "max_score": 20 },
+      { "dimension": "最大可承受亏损", "score": 10, "max_score": 30 },
+      { "dimension": "投资经验", "score": 7, "max_score": 15 },
+      { "dimension": "收入稳定性", "score": 8, "max_score": 15 },
+      { "dimension": "流动性需求", "score": 8, "max_score": 15 },
+      { "dimension": "应急资金", "score": 5, "max_score": 5 }
+    ]
   },
   "meta": {
     "source": "system",

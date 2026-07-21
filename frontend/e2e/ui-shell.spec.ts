@@ -25,7 +25,8 @@ test.describe('App Shell', () => {
   test('navigates to risk page', async ({ page }) => {
     await page.goto('/');
     await page.getByText('风险实验室').click();
-    await expect(page.getByText('由功能负责人独立开发中')).toBeVisible();
+    await expect(page.getByRole('heading', { name: '风险实验室' })).toBeVisible();
+    await expect(page.getByText('教学演示边界')).toBeVisible();
   });
 
   test('navigates to portfolio page', async ({ page }) => {

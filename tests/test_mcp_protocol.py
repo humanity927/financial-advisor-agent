@@ -39,6 +39,7 @@ def test_real_stdio_server_lists_and_calls_tools(tmp_path: Path) -> None:
                 "get_market_snapshot",
                 "assess_investor_profile",
                 "analyze_asset_risk",
+                "analyze_portfolio_risk",
                 "build_allocation",
             }
             result = await session.call_tool(
@@ -50,5 +51,23 @@ def test_real_stdio_server_lists_and_calls_tools(tmp_path: Path) -> None:
             payload = json.loads(text_blocks[0])
             assert payload["ok"] is True
             assert payload["meta"]["source"] == "fixture"
+
+            portfolio_result = await session.call_tool(
+                "analyze_portfolio_risk",
+                {
+                    "weights_pct": {"510300": 60.0, "511010": 40.0},
+                    "lookback_days": 80,
+                },
+            )
+            assert portfolio_result.isError is not True
+            portfolio_blocks = [
+                block.text for block in portfolio_result.content if hasattr(block, "text")
+            ]
+            portfolio_payload = json.loads(portfolio_blocks[0])
+            assert portfolio_payload["ok"] is True
+            assert (
+                portfolio_payload["data"]["portfolio"]["portfolio_metrics"]["observation_count"]
+                == 81
+            )
 
     asyncio.run(run())

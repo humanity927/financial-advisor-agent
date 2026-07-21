@@ -9,6 +9,14 @@ from finance_advisor.schemas import (
 )
 
 RISK_LEVELS = ("保守型", "稳健型", "平衡型", "进取型")
+PROFILE_DIMENSION_MAX_SCORES = {
+    "投资期限": 20,
+    "最大可承受亏损": 30,
+    "投资经验": 15,
+    "收入稳定性": 15,
+    "流动性需求": 15,
+    "应急资金": 5,
+}
 
 
 def _horizon_score(months: int) -> int:
@@ -87,3 +95,15 @@ def assess_profile(profile: InvestorProfileInput) -> RiskAssessment:
         score_breakdown=breakdown,
         hard_limits=hard_limits,
     )
+
+
+def profile_chart_data(assessment: RiskAssessment) -> list[dict[str, int | str]]:
+    """Return the unchanged profile score as six chart-ready dimensions."""
+    return [
+        {
+            "dimension": dimension,
+            "score": assessment.score_breakdown[dimension],
+            "max_score": max_score,
+        }
+        for dimension, max_score in PROFILE_DIMENSION_MAX_SCORES.items()
+    ]
