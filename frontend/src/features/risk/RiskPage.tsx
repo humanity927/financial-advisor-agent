@@ -26,16 +26,17 @@ import type { ProfileInput } from '../../api/types';
 import ProfileForm from '../../components/ProfileForm';
 import PageState from '../../components/PageState';
 import SectionHeader from '../../components/SectionHeader';
+import SourceStamp from '../../components/SourceStamp';
 import { queryKeys } from '../../api/keys';
 import type {
   AssetRiskData,
   AssetRiskResponse,
-  CorrelationMatrix,
   PortfolioAnalysis,
+  PortfolioRiskData,
   PortfolioRiskResponse,
-  RiskDimension,
   RiskProfileData,
 } from './types';
+import './RiskPage.css';
 
 const { Text, Title } = Typography;
 const SYMBOL_OPTIONS = [
@@ -51,32 +52,15 @@ const DEFAULT_WEIGHTS: Record<string, number> = {
   '518880': 20,
   '511880': 10,
 };
-const DIMENSION_MAX: Record<string, number> = {
-  投资期限: 20,
-  最大可承受亏损: 30,
-  投资经验: 15,
-  收入稳定性: 15,
-  流动性需求: 15,
-  应急资金: 5,
-};
-
 function percent(value: number, precision = 2): string {
   return `${value >= 0 ? '+' : ''}${value.toFixed(precision)}%`;
-}
-
-function profileDimensions(profile: RiskProfileData): RiskDimension[] {
-  return profile.dimensions ?? Object.entries(profile.score_breakdown).map(([dimension, score]) => ({
-    dimension,
-    score,
-    max_score: DIMENSION_MAX[dimension] ?? score,
-  }));
 }
 
 function responseError(response: { ok: boolean; error?: { message: string } } | undefined): string {
   return response?.error?.message ?? '请求未返回有效结果';
 }
 
-function StateNotice({
+function ResultNotice({
   source,
   isFallback,
   warnings,
@@ -85,15 +69,24 @@ function StateNotice({
   isFallback: boolean;
   warnings: string[];
 }) {
+  const isFixture = source === 'fixture';
+  if (!isFixture && !isFallback && warnings.length === 0) {
+    return <div className="risk-result-meta"><SourceStamp source={source} /></div>;
+  }
   return (
-    <PageState state="success" source={source} isFallback={isFallback} warnings={warnings}>
-      <></>
-    </PageState>
+    <Alert
+      type={isFixture || isFallback ? 'warning' : 'info'}
+      showIcon
+      message={isFixture ? '演示数据 / 非实时数据' : isFallback ? '回退数据' : '数据提示'}
+      description={warnings.length > 0 ? <ul>{warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : '当前结果可能不是最新数据。'}
+      action={<SourceStamp source={source} isFallback={isFallback} />}
+      className="risk-result-meta"
+    />
   );
 }
 
 function ProfileResult({ profile }: { profile: RiskProfileData }) {
-  const dimensions = profileDimensions(profile);
+  const dimensions = profile.dimensions;
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <Card>
@@ -144,15 +137,11 @@ function AssetResult({ data }: { data: AssetRiskData }) {
     { title: '95% VaR / CVaR', key: 'tail', render: (_: unknown, item: AssetRiskData['assets'][number]) => item.metrics ? `${item.metrics.daily_var_95_pct.toFixed(2)}% / ${item.metrics.daily_cvar_95_pct.toFixed(2)}%` : '数据不足' },
     { title: '观测数', key: 'observations', render: (_: unknown, item: AssetRiskData['assets'][number]) => item.metrics?.observation_count ?? '-' },
   ];
-  return <Card title="单资产历史风险指标"><Table rowKey="symbol" dataSource={data.assets} columns={columns} pagination={false} size="small" /></Card>;
-}
-
-function correlationParts(matrix: CorrelationMatrix): { labels: string[]; values: Array<Array<number | null>> } {
-  return { labels: matrix.symbols ?? matrix.labels ?? [], values: matrix.values ?? matrix.matrix ?? [] };
+  return <Card title="单资产历史风险指标"><Table rowKey="symbol" dataSource={data.assets} columns={columns} pagination={false} size="small" scroll={{ x: 900 }} /></Card>;
 }
 
 function PortfolioResult({ analysis }: { analysis: PortfolioAnalysis }) {
-  const correlation = correlationParts(analysis.correlation_matrix);
+  const correlation = analysis.correlation_matrix;
   const metrics = analysis.portfolio_metrics;
   const curveOption = (points: { date: string; value: number }[], title: string, color: string): EChartsOption => ({
     title: { text: title, left: 8, textStyle: { fontSize: 14, fontWeight: 500 } },
@@ -162,33 +151,34 @@ function PortfolioResult({ analysis }: { analysis: PortfolioAnalysis }) {
     yAxis: { type: 'value', scale: true },
     series: [{ type: 'line', data: points.map((item) => item.value), smooth: true, showSymbol: false, lineStyle: { color }, areaStyle: { color, opacity: 0.08 } }],
   });
-  const netValue = analysis.net_value_curve ?? [];
-  const drawdown = analysis.drawdown_curve ?? [];
+  const netValue = analysis.net_value_curve;
+  const drawdown = analysis.drawdown_curve;
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <Row gutter={[16, 16]}>
         <Col xs={12} md={6}><Card><Statistic title="年化收益" value={metrics.annual_return_pct} precision={2} suffix="%" /></Card></Col>
         <Col xs={12} md={6}><Card><Statistic title="年化波动" value={metrics.annual_volatility_pct} precision={2} suffix="%" /></Card></Col>
-        <Col xs={12} md={6}><Card><Statistic title="最大回撤" value={metrics.max_drawdown_pct} precision={2} suffix="%" valueStyle={{ color: '#3F8600' }} /></Card></Col>
+        <Col xs={12} md={6}><Card><Statistic title="最大回撤" value={metrics.max_drawdown_pct} precision={2} suffix="%" valueStyle={{ color: '#CF1322' }} /></Card></Col>
         <Col xs={12} md={6}><Card><Statistic title="95% VaR / CVaR" value={`${metrics.daily_var_95_pct.toFixed(2)}% / ${metrics.daily_cvar_95_pct.toFixed(2)}%`} /></Card></Col>
       </Row>
       <Card title="组合权重">
         <Space wrap>{Object.entries(analysis.weights_pct).map(([symbol, weight]) => <Tag key={symbol} color="blue">{symbol} {weight.toFixed(2)}%</Tag>)}</Space>
       </Card>
       <Row gutter={[16, 16]}>
-        <Col xs={24} lg={12}><Card>{netValue.length ? <ReactECharts option={curveOption(netValue, '组合净值', '#1A5FB4')} style={{ height: 300 }} /> : <Empty description="暂无净值曲线" />}</Card></Col>
-        <Col xs={24} lg={12}><Card>{drawdown.length ? <ReactECharts option={curveOption(drawdown, '历史回撤', '#CF1322')} style={{ height: 300 }} /> : <Empty description="暂无回撤曲线" />}</Card></Col>
+        <Col xs={24} lg={12}><Card>{netValue.length ? <ReactECharts option={curveOption(netValue, '组合净值', '#1A5FB4')} className="risk-chart" data-testid="risk-net-value-chart" /> : <Empty description="暂无净值曲线" />}</Card></Col>
+        <Col xs={24} lg={12}><Card>{drawdown.length ? <ReactECharts option={curveOption(drawdown, '历史回撤', '#CF1322')} className="risk-chart" data-testid="risk-drawdown-chart" /> : <Empty description="暂无回撤曲线" />}</Card></Col>
       </Row>
       <Card title="共同日期收益相关性">
         <Table
           size="small"
           pagination={false}
           rowKey="label"
-          dataSource={correlation.labels.map((label, index) => ({ label, values: correlation.values[index] ?? [] }))}
+          dataSource={correlation.symbols.map((label, index) => ({ label, values: correlation.values[index] ?? [] }))}
           columns={[
             { title: '标的', dataIndex: 'label', key: 'label' },
-            ...correlation.labels.map((label, index) => ({ title: label, key: label, render: (_: unknown, row: { values: Array<number | null> }) => row.values[index] == null ? '-' : row.values[index]!.toFixed(3) })),
+            ...correlation.symbols.map((label, index) => ({ title: label, key: label, render: (_: unknown, row: { values: Array<number | null> }) => row.values[index] == null ? '-' : row.values[index]!.toFixed(3) })),
           ]}
+          scroll={{ x: 600 }}
         />
       </Card>
     </Space>
@@ -203,13 +193,13 @@ function ProfilePanel() {
   const response = mutation.data;
   return (
     <Row gutter={[24, 24]}>
-      <Col xs={24} lg={8}><ProfileForm onSubmit={(values) => mutation.mutate(values)} loading={mutation.isPending} /></Col>
+      <Col xs={24} lg={8}><ProfileForm onSubmit={(values) => mutation.mutate(values)} loading={mutation.isPending} submitLabel="评估风险画像" submitTestId="risk-profile-submit" /></Col>
       <Col xs={24} lg={16}>
         {mutation.isPending && <PageState state="loading" />}
         {mutation.isError && <PageState state="error" error={mutation.error instanceof Error ? mutation.error.message : '风险画像请求失败'} onRetry={() => mutation.variables && mutation.mutate(mutation.variables)} />}
         {!mutation.isPending && !mutation.isError && !response && <PageState state="empty" emptyDescription="填写左侧画像信息后开始评估" />}
         {response && !response.ok && <PageState state="error" error={responseError(response)} onRetry={() => mutation.variables && mutation.mutate(mutation.variables)} />}
-        {response?.ok && <><StateNotice source={response.meta.source} isFallback={response.meta.is_fallback} warnings={response.warnings} /><ProfileResult profile={response.data} /></>}
+        {response?.ok && <><ResultNotice source={response.meta.source} isFallback={response.meta.is_fallback} warnings={response.warnings} /><ProfileResult profile={response.data} /></>}
       </Col>
     </Row>
   );
@@ -219,23 +209,24 @@ function AssetPanel() {
   const [symbols, setSymbols] = useState(DEFAULT_SYMBOLS);
   const [lookbackDays, setLookbackDays] = useState(252);
   const mutation = useMutation({
-    mutationKey: ['risk', 'assets'],
+    mutationKey: queryKeys.riskAssets,
     mutationFn: (input: { symbols: string[]; lookback_days: number }) => client.post<AssetRiskData>('/risk/assets', input),
   });
   const response = mutation.data as AssetRiskResponse | undefined;
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <Card>
-        <Space wrap>
-          <Select mode="multiple" value={symbols} onChange={setSymbols} options={SYMBOL_OPTIONS} maxCount={4} style={{ minWidth: 320 }} />
+        <Space wrap className="risk-control-row">
+          <Select mode="multiple" value={symbols} onChange={setSymbols} options={SYMBOL_OPTIONS} maxCount={4} className="risk-symbol-select" />
           <InputNumber min={60} max={1260} value={lookbackDays} onChange={(value) => value && setLookbackDays(value)} addonAfter="交易日" />
-          <Button type="primary" icon={<CalculatorOutlined />} onClick={() => mutation.mutate({ symbols, lookback_days: lookbackDays })} loading={mutation.isPending}>计算资产风险</Button>
+          <Button type="primary" icon={<CalculatorOutlined />} onClick={() => mutation.mutate({ symbols, lookback_days: lookbackDays })} loading={mutation.isPending} disabled={symbols.length === 0} data-testid="risk-assets-submit">计算资产风险</Button>
         </Space>
+        {symbols.length === 0 && <Alert type="warning" showIcon message="请至少选择一个白名单标的" style={{ marginTop: 16 }} />}
       </Card>
       {mutation.isPending && <PageState state="loading" />}
       {mutation.isError && <PageState state="error" error={mutation.error instanceof Error ? mutation.error.message : '资产风险请求失败'} onRetry={() => mutation.variables && mutation.mutate(mutation.variables)} />}
       {response && !response.ok && <PageState state="error" error={responseError(response)} onRetry={() => mutation.variables && mutation.mutate(mutation.variables)} />}
-      {response?.ok && <><StateNotice source={response.meta.source} isFallback={response.meta.is_fallback} warnings={response.warnings} /><AssetResult data={response.data} /></>}
+      {response?.ok && <><ResultNotice source={response.meta.source} isFallback={response.meta.is_fallback} warnings={response.warnings} /><AssetResult data={response.data} /></>}
       {!mutation.isPending && !mutation.data && !mutation.isError && <PageState state="empty" emptyDescription="选择标的并开始计算" />}
     </Space>
   );
@@ -245,18 +236,12 @@ function PortfolioPanel() {
   const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
   const [lookbackDays, setLookbackDays] = useState(252);
   const mutation = useMutation({
-    mutationKey: ['risk', 'portfolio'],
-    mutationFn: (input: { weights_pct: Record<string, number>; lookback_days: number }) => client.post<PortfolioRiskResponse['data']>('/risk/portfolio', input),
+    mutationKey: queryKeys.riskPortfolio,
+    mutationFn: (input: { weights_pct: Record<string, number>; lookback_days: number }) => client.post<PortfolioRiskData>('/risk/portfolio', input),
   });
   const response = mutation.data as PortfolioRiskResponse | undefined;
   const total = useMemo(() => Object.values(weights).reduce((sum, value) => sum + value, 0), [weights]);
-  const analysis = response?.ok ? response.data.portfolio ?? (response.data.portfolio_metrics ? {
-    weights_pct: weights,
-    portfolio_metrics: response.data.portfolio_metrics,
-    correlation_matrix: response.data.correlation_matrix ?? {},
-    net_value_curve: response.data.net_value_curve,
-    drawdown_curve: response.data.drawdown_curve,
-  } : null) : null;
+  const analysis = response?.ok ? response.data.portfolio : null;
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <Card title="固定权重每日再平衡">
@@ -267,7 +252,7 @@ function PortfolioPanel() {
           <Space wrap>
             <Tag color={Math.abs(total - 100) < 0.000001 ? 'green' : 'red'}>权重合计：{total.toFixed(2)}%</Tag>
             <InputNumber min={60} max={1260} value={lookbackDays} onChange={(value) => value && setLookbackDays(value)} addonAfter="交易日" />
-            <Button type="primary" icon={<CalculatorOutlined />} disabled={Math.abs(total - 100) >= 0.000001} loading={mutation.isPending} onClick={() => mutation.mutate({ weights_pct: weights, lookback_days: lookbackDays })}>分析组合风险</Button>
+            <Button type="primary" icon={<CalculatorOutlined />} disabled={Math.abs(total - 100) >= 0.000001} loading={mutation.isPending} onClick={() => mutation.mutate({ weights_pct: weights, lookback_days: lookbackDays })} data-testid="risk-portfolio-submit">分析组合风险</Button>
           </Space>
           <Text type="secondary">只使用共同有效收盘价日期；指标描述历史统计，不代表未来表现。</Text>
         </Space>
@@ -276,7 +261,7 @@ function PortfolioPanel() {
       {mutation.isError && <PageState state="error" error={mutation.error instanceof Error ? mutation.error.message : '组合风险请求失败'} onRetry={() => mutation.variables && mutation.mutate(mutation.variables)} />}
       {response && !response.ok && <PageState state="error" error={responseError(response)} onRetry={() => mutation.variables && mutation.mutate(mutation.variables)} />}
       {response?.ok && !analysis && <PageState state="partial" warnings={response.warnings} />}
-      {response?.ok && analysis && <><StateNotice source={response.meta.source} isFallback={response.meta.is_fallback} warnings={response.warnings} /><PortfolioResult analysis={analysis} /></>}
+      {response?.ok && analysis && <><ResultNotice source={response.meta.source} isFallback={response.meta.is_fallback} warnings={response.warnings} /><PortfolioResult analysis={analysis} /></>}
       {!mutation.isPending && !mutation.data && !mutation.isError && <PageState state="empty" emptyDescription="调整权重后开始组合分析" />}
     </Space>
   );
@@ -295,9 +280,9 @@ export default function RiskPage() {
       />
       <Tabs
         items={[
-          { key: 'profile', label: '风险画像', children: <ProfilePanel /> },
-          { key: 'assets', label: '资产风险', children: <AssetPanel /> },
-          { key: 'portfolio', label: '组合风险', children: <PortfolioPanel /> },
+          { key: 'profile', label: <span data-testid="risk-tab-profile">风险画像</span>, children: <ProfilePanel /> },
+          { key: 'assets', label: <span data-testid="risk-tab-assets">资产风险</span>, children: <AssetPanel /> },
+          { key: 'portfolio', label: <span data-testid="risk-tab-portfolio">组合风险</span>, children: <PortfolioPanel /> },
         ]}
       />
       <Divider />

@@ -11,7 +11,7 @@ export interface RiskProfileData {
   risk_level: string;
   score_breakdown: Record<string, number>;
   hard_limits: string[];
-  dimensions?: RiskDimension[];
+  dimensions: RiskDimension[];
 }
 
 export interface AssetRiskMetrics {
@@ -46,10 +46,8 @@ export interface CurvePoint {
 }
 
 export interface CorrelationMatrix {
-  symbols?: string[];
-  values?: Array<Array<number | null>>;
-  labels?: string[];
-  matrix?: Array<Array<number | null>>;
+  symbols: string[];
+  values: Array<Array<number | null>>;
 }
 
 export interface PortfolioMetrics {
@@ -67,21 +65,24 @@ export interface PortfolioAnalysis {
   weights_pct: Record<string, number>;
   portfolio_metrics: PortfolioMetrics;
   correlation_matrix: CorrelationMatrix;
-  net_value_curve?: CurvePoint[];
-  drawdown_curve?: CurvePoint[];
-  methodology?: Record<string, string>;
+  net_value_curve: CurvePoint[];
+  drawdown_curve: CurvePoint[];
+  methodology: Record<string, string>;
+}
+
+export interface PortfolioAsset {
+  symbol: string;
+  name: string;
+  asset_class: string;
+  weight_pct: number;
+  source: string;
+  warning: string | null;
 }
 
 export interface PortfolioRiskData {
   portfolio: PortfolioAnalysis | null;
-  assets: AssetRiskResult[];
+  assets: PortfolioAsset[];
   method: string;
-  portfolio_metrics?: PortfolioMetrics;
-  correlation_matrix?: CorrelationMatrix;
-  net_value_curve?: CurvePoint[];
-  drawdown_curve?: CurvePoint[];
-  score?: number;
-  risk_level?: string;
 }
 
 export type RiskProfileResponse = ApiResponse<RiskProfileData>;

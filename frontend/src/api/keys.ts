@@ -5,6 +5,7 @@ export const queryKeys = {
   marketCompare: (symbols: string[], range?: string) =>
     ['market', 'compare', range ?? 'default', ...symbols] as const,
   riskProfile: ['risk', 'profile'] as const,
+  riskAssets: ['risk', 'assets'] as const,
   riskPortfolio: ['risk', 'portfolio'] as const,
   portfolioPlan: ['portfolio', 'plan'] as const,
   advisorReport: ['advisor', 'report'] as const,

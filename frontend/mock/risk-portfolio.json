@@ -1,48 +1,68 @@
 {
   "ok": true,
   "data": {
-    "risk_level": "稳健型",
-    "score": 46,
-    "score_breakdown": {
-      "投资期限": 8,
-      "最大可承受亏损": 10,
-      "投资经验": 7,
-      "收入稳定性": 8,
-      "流动性需求": 8,
-      "应急资金": 5
+    "portfolio": {
+      "weights_pct": {
+        "510300": 40.0,
+        "511010": 30.0,
+        "518880": 20.0,
+        "511880": 10.0
+      },
+      "portfolio_metrics": {
+        "observation_count": 253,
+        "start_date": "2025-07-30",
+        "end_date": "2026-07-17",
+        "annual_return_pct": 2.3325,
+        "annual_volatility_pct": 3.9856,
+        "max_drawdown_pct": -3.2517,
+        "daily_var_95_pct": 0.4012,
+        "daily_cvar_95_pct": 0.5784
+      },
+      "correlation_matrix": {
+        "symbols": ["510300", "511010", "518880", "511880"],
+        "values": [
+          [1.0, -0.23, 0.15, -0.08],
+          [-0.23, 1.0, -0.12, 0.31],
+          [0.15, -0.12, 1.0, -0.05],
+          [-0.08, 0.31, -0.05, 1.0]
+        ]
+      },
+      "net_value_curve": [
+        { "date": "2025-07-30", "value": 1.0 },
+        { "date": "2025-09-30", "value": 1.0062 },
+        { "date": "2025-12-31", "value": 1.0118 },
+        { "date": "2026-03-31", "value": 1.0087 },
+        { "date": "2026-05-29", "value": 1.0215 },
+        { "date": "2026-07-17", "value": 1.0233 }
+      ],
+      "drawdown_curve": [
+        { "date": "2025-07-30", "value": 0.0 },
+        { "date": "2025-09-30", "value": 0.0 },
+        { "date": "2025-12-31", "value": 0.0 },
+        { "date": "2026-03-31", "value": -0.3064 },
+        { "date": "2026-05-29", "value": 0.0 },
+        { "date": "2026-07-17", "value": 0.0 }
+      ],
+      "methodology": {
+        "portfolio_return": "固定权重每日再平衡的加权日收益",
+        "annualization": "每年252个交易日",
+        "var_cvar": "历史模拟法，单日95%置信水平",
+        "data_alignment": "仅使用全部标的共有的有效收盘价日期"
+      }
     },
-    "score_max": {
-      "投资期限": 20,
-      "最大可承受亏损": 30,
-      "投资经验": 15,
-      "收入稳定性": 15,
-      "流动性需求": 15,
-      "应急资金": 5
-    },
-    "correlation_matrix": {
-      "labels": ["沪深300ETF", "国债ETF", "黄金ETF", "货币ETF"],
-      "matrix": [
-        [1.0, -0.23, 0.15, -0.08],
-        [-0.23, 1.0, -0.12, 0.31],
-        [0.15, -0.12, 1.0, -0.05],
-        [-0.08, 0.31, -0.05, 1.0]
-      ]
-    },
-    "portfolio_metrics": {
-      "observation_count": 252,
-      "annual_return_pct": 2.34,
-      "annual_volatility_pct": 3.87,
-      "max_drawdown_pct": -2.15,
-      "daily_var_95_pct": 0.42,
-      "daily_cvar_95_pct": 0.68
-    },
-    "method": "历史数据统计，不代表未来表现"
+    "assets": [
+      { "symbol": "510300", "name": "沪深300ETF", "asset_class": "股票", "weight_pct": 40.0, "source": "fixture", "warning": "演示数据/非实时数据" },
+      { "symbol": "511010", "name": "国债ETF", "asset_class": "债券", "weight_pct": 30.0, "source": "fixture", "warning": "演示数据/非实时数据" },
+      { "symbol": "518880", "name": "黄金ETF", "asset_class": "黄金", "weight_pct": 20.0, "source": "fixture", "warning": "演示数据/非实时数据" },
+      { "symbol": "511880", "name": "货币ETF", "asset_class": "现金", "weight_pct": 10.0, "source": "fixture", "warning": "演示数据/非实时数据" }
+    ],
+    "method": "固定权重每日再平衡的历史组合统计，不代表未来表现"
   },
   "meta": {
     "source": "fixture",
     "as_of": "2026-07-17",
-    "request_id": "mock-004",
+    "request_id": "mock-risk-portfolio",
     "is_fallback": true
   },
-  "warnings": ["演示数据/非实时数据"]
+  "warnings": ["演示数据/非实时数据", "历史相关性和风险指标不代表未来表现"]
 }

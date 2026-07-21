@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -95,3 +96,33 @@ def test_risk_validation_errors_keep_unified_envelope(client: TestClient) -> Non
     assert payload["ok"] is False
     assert payload["error"]["code"] == "validation_error"
     assert payload["data"]["validation_errors"]
+
+
+def test_frontend_risk_fixtures_follow_http_contract(client: TestClient) -> None:
+    root = Path(__file__).resolve().parents[1]
+    mock_dir = root / "frontend" / "mock"
+    profile_fixture = json.loads((mock_dir / "risk-profile.json").read_text(encoding="utf-8"))
+    assets_fixture = json.loads((mock_dir / "risk-assets.json").read_text(encoding="utf-8"))
+    portfolio_fixture = json.loads((mock_dir / "risk-portfolio.json").read_text(encoding="utf-8"))
+
+    profile = client.post("/api/risk/profile", json=PROFILE).json()
+    assets = client.post(
+        "/api/risk/assets",
+        json={"symbols": ["510300", "511010"], "lookback_days": 252},
+    ).json()
+    portfolio = client.post(
+        "/api/risk/portfolio",
+        json={
+            "weights_pct": {"510300": 40, "511010": 30, "518880": 20, "511880": 10},
+            "lookback_days": 252,
+        },
+    ).json()
+
+    assert set(profile_fixture["data"]) == set(profile["data"])
+    assert set(assets_fixture["data"]) == set(assets["data"])
+    assert set(assets_fixture["data"]["assets"][0]) == set(assets["data"]["assets"][0])
+    assert set(portfolio_fixture["data"]) == set(portfolio["data"])
+    assert set(portfolio_fixture["data"]["portfolio"]) == set(portfolio["data"]["portfolio"])
+    assert set(portfolio_fixture["data"]["portfolio"]["portfolio_metrics"]) == set(
+        portfolio["data"]["portfolio"]["portfolio_metrics"]
+    )
