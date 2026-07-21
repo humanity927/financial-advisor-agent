@@ -2,6 +2,7 @@
 
 > 负责人：4号成员  
 > 分支：`feat/risk-lab-mcp`  
+> 本次交付提交：`cccf4b8` (`feat(risk): complete risk lab web integration`)
 > 基线：`main@1231474`；依赖 3 号 Web 骨架：`6f26abc`
 > 文档更新时间：2026-07-21
 > 状态：风险后端 API、风险实验室页面、fixture、定向测试已完成；合并与真实服务联调结果见本文第 8 节。
