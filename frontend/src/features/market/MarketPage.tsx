@@ -8,12 +8,16 @@ import {
   Checkbox,
   Col,
   Descriptions,
+  Empty,
+  Input,
+  List,
   Row,
   Segmented,
   Space,
   Table,
   Tag,
   Typography,
+  message,
 } from 'antd';
 import type { TableColumnsType } from 'antd';
 import {
@@ -24,7 +28,9 @@ import {
   Layers3,
   LineChart,
   ListChecks,
+  Plus,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import SectionHeader from '../../components/SectionHeader';
 import PageState from '../../components/PageState';
@@ -32,7 +38,8 @@ import SourceStamp from '../../components/SourceStamp';
 import MetricValue from '../../components/MetricValue';
 import { client } from '../../api/client';
 import { queryKeys } from '../../api/keys';
-import type { MarketSnapshot } from '../../api/types';
+import type { CatalogSearchData, CatalogSymbol, MarketSnapshot } from '../../api/types';
+import { useWorkspace } from '../../app/WorkspaceContext';
 import type {
   MarketCompareData,
   MarketIntervalReturn,
@@ -42,14 +49,6 @@ import type {
 } from './types';
 import './MarketPage.css';
 
-const SUPPORTED_SYMBOLS = [
-  { label: '沪深300ETF', value: '510300', assetClass: '股票' },
-  { label: '国债ETF', value: '511010', assetClass: '债券' },
-  { label: '黄金ETF', value: '518880', assetClass: '黄金' },
-  { label: '货币ETF', value: '511880', assetClass: '现金' },
-];
-
-const DEFAULT_SYMBOLS = SUPPORTED_SYMBOLS.map((item) => item.value);
 const RANGE_OPTIONS = [
   { label: '近1月', value: '1M' },
   { label: '近3月', value: '3M' },
@@ -79,8 +78,34 @@ function formatTimestamp(value: string) {
 }
 
 export default function MarketPage() {
+  const { watchedSymbols, selectedSymbols, setSelectedSymbols, addSymbol, removeSymbol } = useWorkspace();
   const [range, setRange] = useState<MarketRange>('1Y');
-  const [selectedSymbols, setSelectedSymbols] = useState<string[]>(DEFAULT_SYMBOLS);
+  const [searchText, setSearchText] = useState('');
+  const [submittedSearch, setSubmittedSearch] = useState('');
+  const [messageApi, messageContext] = message.useMessage();
+
+  const catalogQuery = useQuery({
+    queryKey: ['market', 'catalog', submittedSearch],
+    queryFn: ({ signal }) =>
+      client.get<CatalogSearchData>(
+        `/market/catalog/search?q=${encodeURIComponent(submittedSearch)}&refresh=true`,
+        signal,
+      ),
+    enabled: submittedSearch.trim().length > 0,
+    retry: false,
+  });
+
+  const handleAddSymbol = (item: CatalogSymbol) => {
+    if (watchedSymbols.length >= 8) {
+      messageApi.warning('关注列表最多保留 8 个标的');
+      return;
+    }
+    if (!addSymbol(item)) {
+      messageApi.info(`${item.symbol} 已在关注列表`);
+      return;
+    }
+    messageApi.success(`已关注 ${item.symbol} · ${item.name}`);
+  };
 
   const compareQuery = useQuery({
     queryKey: queryKeys.marketCompare(selectedSymbols, range),
@@ -102,8 +127,9 @@ export default function MarketPage() {
   );
   const isFixture =
     compareQuery.data?.meta.source === 'fixture' ||
-    compareQuery.data?.meta.is_fallback ||
     warnings.some((warning) => warning.includes('非实时') || warning.includes('演示数据'));
+  const isCachedFallback =
+    compareQuery.data?.meta.source === 'cache' && compareQuery.data.meta.is_fallback;
 
   const returnBySymbol = useMemo(() => {
     return new Map(
@@ -252,9 +278,10 @@ export default function MarketPage() {
 
   return (
     <div className="market-page">
+      {messageContext}
       <SectionHeader
         title="行情对比"
-        subtitle="白名单 ETF 的归一化走势、区间收益和数据来源核验"
+        subtitle="A 股指数与 ETF 的关注管理、行情快照和多标的比较"
         actions={
           <Button
             type="primary"
@@ -275,14 +302,14 @@ export default function MarketPage() {
               <div>
                 <Typography.Title level={5}>对比范围</Typography.Title>
                 <Typography.Text type="secondary">
-                  已选 {selectedSymbols.length} / {SUPPORTED_SYMBOLS.length} 个标的
+                  已选 {selectedSymbols.length} / {watchedSymbols.length} 个关注标的
                 </Typography.Text>
               </div>
               <Space wrap>
                 <Button
                   icon={<ListChecks size={14} />}
-                  onClick={() => setSelectedSymbols(DEFAULT_SYMBOLS)}
-                  disabled={selectedSymbols.length === DEFAULT_SYMBOLS.length}
+                  onClick={() => setSelectedSymbols(watchedSymbols.map((item) => item.symbol))}
+                  disabled={selectedSymbols.length === watchedSymbols.length}
                 >
                   全选
                 </Button>
@@ -297,6 +324,57 @@ export default function MarketPage() {
             </div>
 
             <div className="market-filter-grid">
+              <div className="market-filter-block market-search-block">
+                <Typography.Text strong className="market-filter-label">
+                  搜索 A 股指数或 ETF
+                </Typography.Text>
+                <Input.Search
+                  value={searchText}
+                  onChange={(event) => setSearchText(event.target.value)}
+                  onSearch={(value) => setSubmittedSearch(value.trim())}
+                  enterButton="搜索"
+                  allowClear
+                  placeholder="输入代码或名称"
+                  loading={catalogQuery.isFetching}
+                />
+                {catalogQuery.isError && (
+                  <Alert
+                    type="error"
+                    showIcon
+                    message="标的搜索失败"
+                    description={catalogQuery.error instanceof Error ? catalogQuery.error.message : 'AKShare 与本地目录均不可用'}
+                  />
+                )}
+                {catalogQuery.isSuccess && catalogQuery.data.data.items.length === 0 && (
+                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有匹配的指数或 ETF" />
+                )}
+                {catalogQuery.isSuccess && catalogQuery.data.data.items.length > 0 && (
+                  <List
+                    className="market-search-results"
+                    size="small"
+                    dataSource={catalogQuery.data.data.items}
+                    renderItem={(item) => (
+                      <List.Item
+                        actions={[
+                          <Button
+                            key="add"
+                            type="text"
+                            icon={<Plus size={15} />}
+                            aria-label={`关注 ${item.symbol}`}
+                            onClick={() => handleAddSymbol(item)}
+                          />,
+                        ]}
+                      >
+                        <List.Item.Meta
+                          title={`${item.symbol} · ${item.name}`}
+                          description={`${item.market} · ${item.asset_type === 'index' ? '指数' : 'ETF'} · ${item.asset_class}`}
+                        />
+                      </List.Item>
+                    )}
+                  />
+                )}
+              </div>
+
               <div className="market-filter-block">
                 <Typography.Text strong className="market-filter-label">
                   <CalendarRange size={16} />
@@ -313,22 +391,35 @@ export default function MarketPage() {
               <div className="market-filter-block market-symbol-block">
                 <Typography.Text strong className="market-filter-label">
                   <Layers3 size={16} />
-                  白名单 ETF
+                  关注列表
                 </Typography.Text>
-                <Checkbox.Group
-                  className="market-symbol-grid"
-                  value={selectedSymbols}
-                  onChange={(values) => setSelectedSymbols(values.map(String))}
-                >
-                  {SUPPORTED_SYMBOLS.map((item) => (
-                    <Checkbox className="market-symbol-option" value={item.value} key={item.value}>
-                      <span className="market-symbol-copy">
-                        <strong>{item.label}</strong>
-                        <span>{item.value} · {item.assetClass}</span>
-                      </span>
-                    </Checkbox>
-                  ))}
-                </Checkbox.Group>
+                {watchedSymbols.length === 0 ? (
+                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="搜索并添加关注标的" />
+                ) : (
+                  <Checkbox.Group
+                    className="market-symbol-grid"
+                    value={selectedSymbols}
+                    onChange={(values) => setSelectedSymbols(values.map(String))}
+                  >
+                    {watchedSymbols.map((item) => (
+                      <div className="market-symbol-option" key={item.symbol}>
+                        <Checkbox value={item.symbol}>
+                          <span className="market-symbol-copy">
+                            <strong>{item.name}</strong>
+                            <span>{item.symbol} · {item.asset_class}</span>
+                          </span>
+                        </Checkbox>
+                        <Button
+                          type="text"
+                          danger
+                          icon={<Trash2 size={14} />}
+                          aria-label={`删除 ${item.symbol}`}
+                          onClick={() => removeSymbol(item.symbol)}
+                        />
+                      </div>
+                    ))}
+                  </Checkbox.Group>
+                )}
               </div>
             </div>
 
@@ -337,7 +428,7 @@ export default function MarketPage() {
                 type="warning"
                 showIcon
                 message="请至少选择一个白名单标的"
-                description="当前行情接口只支持 510300、511010、518880、511880。"
+                description="请从已校验的 A 股指数或 ETF 关注列表中选择。"
                 className="market-selection-warning"
               />
             )}
@@ -389,9 +480,9 @@ export default function MarketPage() {
               )}
               {!isFixture && warnings.length > 0 && (
                 <Alert
-                  type="info"
+                  type={isCachedFallback ? 'warning' : 'info'}
                   showIcon
-                  message="数据提示"
+                  message={isCachedFallback ? '真实行情缓存 / 非实时数据' : '数据提示'}
                   description={warnings.join('；')}
                   className="market-data-alert"
                 />

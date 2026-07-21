@@ -1,5 +1,6 @@
+import { useEffect } from 'react';
 import { Form, InputNumber, Select, Button, Card, Typography, Space } from 'antd';
-import type { ProfileInput } from '../api/types';
+import type { CatalogSymbol, ProfileInput } from '../api/types';
 
 const { Title } = Typography;
 
@@ -11,6 +12,9 @@ interface ProfileFormProps {
   submitDisabled?: boolean;
   symbols?: string[];
   onSymbolsChange?: (symbols: string[]) => void;
+  initialValues?: Partial<ProfileInput>;
+  onValuesChange?: (values: Partial<ProfileInput>) => void;
+  symbolOptions?: CatalogSymbol[];
 }
 
 const INCOME_OPTIONS = [
@@ -47,8 +51,15 @@ export default function ProfileForm({
   submitDisabled = false,
   symbols,
   onSymbolsChange,
+  initialValues,
+  onValuesChange,
+  symbolOptions,
 }: ProfileFormProps) {
   const [form] = Form.useForm<ProfileInput>();
+
+  useEffect(() => {
+    if (initialValues) form.setFieldsValue(initialValues);
+  }, [form, initialValues]);
 
   const handleFinish = (values: ProfileInput) => {
     onSubmit(values);
@@ -61,6 +72,7 @@ export default function ProfileForm({
         form={form}
         layout="vertical"
         onFinish={handleFinish}
+        onValuesChange={(_, values) => onValuesChange?.(values)}
         initialValues={{
           amount_cny: 50000,
           horizon_months: 12,
@@ -69,6 +81,7 @@ export default function ProfileForm({
           experience: 'basic' as const,
           liquidity_need: 'medium' as const,
           emergency_fund_months: 6,
+          ...initialValues,
         }}
       >
         <Space direction="vertical" style={{ width: '100%' }} size="small">
@@ -106,9 +119,12 @@ export default function ProfileForm({
                 mode="multiple"
                 value={symbols}
                 onChange={onSymbolsChange}
-                options={SYMBOL_OPTIONS}
+                options={symbolOptions?.map((item) => ({
+                  value: item.symbol,
+                  label: `${item.symbol} · ${item.name}`,
+                })) ?? SYMBOL_OPTIONS}
                 placeholder="选择关注标的"
-                maxCount={4}
+                maxCount={8}
               />
             </Form.Item>
           )}

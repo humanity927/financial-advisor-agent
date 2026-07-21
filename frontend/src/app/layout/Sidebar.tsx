@@ -6,6 +6,8 @@ import {
   Shield,
   PieChart,
   FileText,
+  Bot,
+  History,
 } from 'lucide-react';
 
 const { Sider } = Layout;
@@ -15,7 +17,9 @@ const NAV_ITEMS = [
   { key: '/market', icon: TrendingUp, label: '行情对比' },
   { key: '/risk', icon: Shield, label: '风险实验室' },
   { key: '/portfolio', icon: PieChart, label: '配置规划' },
-  { key: '/advisor', icon: FileText, label: 'Agent 报告' },
+  { key: '/advisor', icon: Bot, label: 'Agent 咨询' },
+  { key: '/report', icon: FileText, label: '正式报告' },
+  { key: '/history', icon: History, label: '历史记录' },
 ];
 
 export default function Sidebar() {
@@ -25,12 +29,15 @@ export default function Sidebar() {
   return (
     <Sider
       width={224}
+      breakpoint="lg"
+      collapsedWidth={0}
       style={{
         background: '#fff',
         borderRight: '1px solid var(--color-border)',
       }}
     >
       <div
+        className="shell-brand"
         style={{
           height: 54,
           display: 'flex',
@@ -42,7 +49,7 @@ export default function Sidebar() {
           color: 'var(--color-brand)',
         }}
       >
-        深睡金股
+        理财咨询工作台
       </div>
       <Menu
         mode="inline"

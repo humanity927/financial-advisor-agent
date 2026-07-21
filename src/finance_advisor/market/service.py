@@ -84,7 +84,6 @@ class MarketService:
         if stale is not None:
             return stale
 
-        fixture = self.fixture.fetch_history(symbol, lookback_days)
         if live_error is not None:
-            fixture = fixture.model_copy(update={"warning": f"实时行情不可用，{fixture.warning}"})
-        return fixture
+            raise RuntimeError("AKShare请求失败，且没有可用的真实行情缓存") from live_error
+        raise RuntimeError("AKShare不可用，且没有可用的真实行情缓存")

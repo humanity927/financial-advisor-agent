@@ -5,19 +5,29 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const startupTimeoutMs = 30_000;
+const apiPort = Number(process.env.FINANCE_E2E_API_PORT ?? 8123);
+const vitePort = Number(process.env.FINANCE_E2E_VITE_PORT ?? 5173);
+process.env.FINANCE_API_TARGET = `http://127.0.0.1:${apiPort}`;
+process.env.FINANCE_E2E_BASE_URL = `http://127.0.0.1:${vitePort}`;
 
 const services = [
   {
     name: 'fixture mock API',
     command: process.execPath,
     args: [join(root, 'e2e', 'mock-api.mjs')],
-    url: 'http://127.0.0.1:8123/api/health',
+    url: `http://127.0.0.1:${apiPort}/api/health`,
   },
   {
     name: 'Vite dev server',
     command: process.execPath,
-    args: [join(root, 'node_modules', 'vite', 'bin', 'vite.js'), '--host', '127.0.0.1'],
-    url: 'http://127.0.0.1:5173',
+    args: [
+      join(root, 'node_modules', 'vite', 'bin', 'vite.js'),
+      '--host',
+      '127.0.0.1',
+      '--port',
+      String(vitePort),
+    ],
+    url: `http://127.0.0.1:${vitePort}`,
   },
 ];
 
@@ -103,6 +113,8 @@ async function runPlaywright(args) {
       env: {
         ...process.env,
         FINANCE_SKIP_PLAYWRIGHT_WEBSERVER: '1',
+        FINANCE_API_TARGET: `http://127.0.0.1:${apiPort}`,
+        FINANCE_E2E_BASE_URL: `http://127.0.0.1:${vitePort}`,
       },
       stdio: 'inherit',
     },

@@ -2,7 +2,6 @@
 param(
     [int]$Port = 8123,
     [switch]$NoOpen,
-    [switch]$ForceFixture,
     [switch]$SkipFrontendBuild
 )
 
@@ -19,11 +18,12 @@ if (-not (Test-Path $Uvicorn)) {
 $FrontendDir = Join-Path $Root "frontend"
 $FrontendDist = Join-Path $FrontendDir "dist"
 $FrontendPackage = Join-Path $FrontendDir "package.json"
+$HermesHome = Join-Path $Root ".runtime\hermes"
 
 $env:FINANCE_PROJECT_ROOT = $Root
-if ($ForceFixture) {
-    $env:FINANCE_FORCE_FIXTURE = "1"
-}
+$env:HERMES_HOME = $HermesHome
+$env:FINANCE_FORCE_FIXTURE = "0"
+& (Join-Path $PSScriptRoot "sync-hermes-config.ps1")
 
 if (Test-Path $FrontendPackage) {
     if ($SkipFrontendBuild) {

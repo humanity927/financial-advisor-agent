@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import AppShell from './app/layout/AppShell';
 import OverviewPage from './features/overview/OverviewPage';
 import AdvisorPage from './features/advisor/AdvisorPage';
+import ChatPage from './features/advisor/ChatPage';
+import HistoryPage from './features/history/HistoryPage';
 import PageState from './components/PageState';
 
 const MarketPage = lazy(() => import('./features/market/MarketPage'));
@@ -39,7 +41,9 @@ export default function App() {
               </Suspense>
             }
           />
-          <Route path="advisor" element={<AdvisorPage />} />
+          <Route path="advisor" element={<ChatPage />} />
+          <Route path="report" element={<AdvisorPage />} />
+          <Route path="history" element={<HistoryPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

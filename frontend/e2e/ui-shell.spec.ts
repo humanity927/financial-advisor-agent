@@ -5,7 +5,7 @@ test.describe('App Shell', () => {
     await page.goto('/');
 
     await expect(page.locator('.ant-layout-sider')).toBeVisible();
-    await expect(page.getByRole('menuitem')).toHaveCount(5);
+    await expect(page.getByRole('menuitem')).toHaveCount(7);
     await expect(page.getByTestId('system-topbar')).toBeVisible();
   });
 
@@ -35,8 +35,8 @@ test.describe('App Shell', () => {
   test('navigates to advisor page', async ({ page }) => {
     await page.goto('/advisor');
 
-    await expect(page).toHaveURL(/\/advisor$/);
-    await expect(page.locator('form')).toBeVisible();
+    await expect(page).toHaveURL(/\/advisor(?:\?session=[^&]+)?$/);
+    await expect(page.getByPlaceholder('输入咨询内容')).toBeVisible();
   });
 
   test('shows fixture mode indicators in top bar', async ({ page }) => {
@@ -45,5 +45,20 @@ test.describe('App Shell', () => {
     const topbar = page.getByTestId('system-topbar');
     await expect(topbar).toBeVisible();
     await expect(topbar.locator('.ant-tag')).toHaveCount(2);
+  });
+
+  test('keeps the mobile navigation trigger inside the viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/advisor');
+
+    const trigger = page.locator('.ant-layout-sider-zero-width-trigger');
+    await expect(trigger).toBeVisible();
+    const bounds = await trigger.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds?.x).toBeGreaterThanOrEqual(0);
+    expect((bounds?.x ?? 0) + (bounds?.width ?? 0)).toBeLessThanOrEqual(390);
+
+    await trigger.click();
+    await expect(page.getByRole('menuitem', { name: '行情对比' })).toBeVisible();
   });
 });

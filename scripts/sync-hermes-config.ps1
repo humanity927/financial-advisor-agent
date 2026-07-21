@@ -1,7 +1,5 @@
 [CmdletBinding()]
-param(
-    [switch]$ForceFixture
-)
+param()
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
@@ -35,7 +33,7 @@ New-Item -ItemType Directory -Force $RuntimeHome | Out-Null
 
 $RelayBaseUrl = Get-DotEnvValue "RELAY_BASE_URL" "https://example.invalid/v1"
 $RelayModelId = Get-DotEnvValue "RELAY_MODEL_ID" "gpt-5.6"
-$FixtureMode = if ($ForceFixture) { "1" } else { Get-DotEnvValue "FINANCE_FORCE_FIXTURE" "0" }
+$FixtureMode = "0"
 
 $ForwardRoot = $Root.Replace("\", "/")
 $CacheDir = (Join-Path $Root ".runtime\cache").Replace("\", "/")

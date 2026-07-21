@@ -75,7 +75,7 @@ def test_market_and_risk_tools_use_explicit_fixture(monkeypatch: object, tmp_pat
 
 
 def test_invalid_symbol_and_lookback_are_structured_errors() -> None:
-    invalid_symbol = server.get_market_snapshot(["000001"])
+    invalid_symbol = server.get_market_snapshot(["999999"])
     invalid_lookback = server.analyze_asset_risk(["510300"], 10)
 
     assert invalid_symbol["error"]["code"] == "invalid_symbol"

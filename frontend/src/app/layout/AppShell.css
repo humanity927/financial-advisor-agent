@@ -1,5 +1,6 @@
 .shell {
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 .shell .ant-layout-sider {
@@ -26,4 +27,47 @@
 .shell-content .ant-card {
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
   border-radius: var(--radius-lg);
+}
+
+@media (max-width: 991px) {
+  .shell .ant-layout-sider ~ .ant-layout {
+    margin-left: 0;
+  }
+
+  .shell-topbar {
+    left: 0 !important;
+    padding-left: 56px !important;
+  }
+
+  .shell-content {
+    padding: var(--space-md);
+  }
+
+  .shell .ant-layout-sider-zero-width-trigger {
+    position: fixed;
+    top: 7px;
+    bottom: auto;
+    right: auto;
+    left: 0;
+    inset-inline-start: 0;
+    inset-inline-end: auto;
+    z-index: 110;
+  }
+}
+
+@media (max-width: 600px) {
+  .shell-topbar {
+    gap: 6px !important;
+    padding-right: 8px !important;
+    overflow: hidden;
+  }
+
+  .shell-topbar .ant-tag,
+  .shell-topbar span {
+    white-space: nowrap;
+  }
+
+  .shell-content {
+    padding: 12px;
+  }
 }

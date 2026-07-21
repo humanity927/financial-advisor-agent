@@ -1,17 +1,23 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import asdict
 from typing import Any
 
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
+from finance_advisor.market.akshare_provider import MarketProviderError
 from finance_advisor.market.compare import (
     MarketCompareRequest,
     compare_market_performance,
     required_history_days,
 )
-from finance_advisor.market.symbols import SymbolValidationError, normalize_symbols
+from finance_advisor.market.symbols import (
+    SymbolValidationError,
+    get_symbol_catalog,
+    normalize_symbols,
+)
 from finance_advisor.schemas import error_response, success_response
 from finance_advisor.web.common import (
     get_market_service,
@@ -25,9 +31,50 @@ LOGGER = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.get("/catalog/search", response_model=None)
+def search_market_catalog(
+    q: str = Query(default="", max_length=80),
+    refresh: bool = Query(default=True),
+) -> dict[str, Any] | JSONResponse:
+    catalog = get_symbol_catalog()
+    warnings: list[str] = []
+    source = "cache" if catalog.fetched_at else "system"
+    if refresh and q.strip():
+        try:
+            live_items = get_market_service().live.search_etfs(q, limit=50)
+            if live_items:
+                catalog.register_akshare(live_items)
+            source = "akshare"
+        except MarketProviderError:
+            LOGGER.warning("AKShare catalog search failed query_length=%s", len(q.strip()))
+            warnings.append("AKShare标的目录暂不可用，已展示本地已校验目录")
+
+    items = catalog.search(q, limit=50)
+    if not items and warnings:
+        return JSONResponse(
+            status_code=503,
+            content=error_response(
+                "catalog_unavailable",
+                "标的搜索失败，AKShare与本地真实目录均无可用结果",
+                retryable=True,
+            ),
+        )
+    return success_response(
+        {
+            "items": [asdict(item) for item in items],
+            "catalog_fetched_at": catalog.fetched_at,
+            "query": q.strip(),
+        },
+        source=source,
+        as_of=catalog.fetched_at,
+        is_fallback=bool(warnings),
+        warnings=warnings,
+    )
+
+
 @router.get("/snapshot", response_model=None)
 def market_snapshot(
-    symbols: str = Query(..., min_length=1, description="逗号分隔的白名单 ETF 代码"),
+    symbols: str = Query(..., min_length=1, description="逗号分隔的已校验A股指数或ETF代码"),
 ) -> dict[str, Any] | JSONResponse:
     try:
         normalized = normalize_symbols(symbols.split(","))
@@ -48,7 +95,7 @@ def market_snapshot(
             status_code=503,
             content=error_response(
                 "market_data_unavailable",
-                "行情快照失败，且缓存与演示数据均不可用",
+                "行情快照失败，AKShare与真实行情缓存均不可用",
                 retryable=True,
             ),
         )
@@ -94,7 +141,7 @@ def compare_market(request: MarketCompareRequest) -> dict[str, Any] | JSONRespon
             status_code=503,
             content=error_response(
                 "market_data_unavailable",
-                "行情对比失败，且缓存与演示数据均不可用",
+                "行情对比失败，AKShare与真实行情缓存均不可用",
                 retryable=True,
             ),
         )

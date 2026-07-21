@@ -1,8 +1,7 @@
 [CmdletBinding()]
 param(
     [switch]$NoOpen,
-    [switch]$SkipPreflight,
-    [switch]$ForceFixture
+    [switch]$SkipPreflight
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,9 +17,7 @@ $env:HERMES_HOME = Join-Path $Root ".runtime\hermes"
 $env:FINANCE_PROJECT_ROOT = $Root
 $env:HERMES_TUI_DIR = Join-Path $Root ".runtime\hermes-tui"
 
-$SyncArgs = @()
-if ($ForceFixture) { $SyncArgs += "-ForceFixture" }
-& (Join-Path $PSScriptRoot "sync-hermes-config.ps1") @SyncArgs
+& (Join-Path $PSScriptRoot "sync-hermes-config.ps1")
 
 $TuiEntry = Join-Path $env:HERMES_TUI_DIR "dist\entry.js"
 if (-not (Test-Path $TuiEntry)) {

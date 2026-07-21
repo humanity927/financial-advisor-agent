@@ -71,8 +71,22 @@ def test_market_snapshot_supports_overview_contract(client: TestClient) -> None:
     ]
 
 
+def test_catalog_search_supports_code_name_and_empty_results(client: TestClient) -> None:
+    by_name = client.get("/api/market/catalog/search", params={"q": "沪深300", "refresh": "false"})
+    by_code = client.get("/api/market/catalog/search", params={"q": "000001", "refresh": "false"})
+    empty = client.get(
+        "/api/market/catalog/search", params={"q": "不存在的标的", "refresh": "false"}
+    )
+
+    assert by_name.status_code == 200
+    assert any(item["symbol"] == "510300" for item in by_name.json()["data"]["items"])
+    assert by_code.json()["data"]["items"][0]["asset_type"] == "index"
+    assert empty.status_code == 200
+    assert empty.json()["data"]["items"] == []
+
+
 def test_market_snapshot_rejects_unsupported_symbol(client: TestClient) -> None:
-    response = client.get("/api/market/snapshot", params={"symbols": "000001"})
+    response = client.get("/api/market/snapshot", params={"symbols": "999999"})
 
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "invalid_symbol"
@@ -107,7 +121,7 @@ def test_market_compare_loads_symbols_concurrently(
 def test_market_compare_rejects_unsupported_symbol(client: TestClient) -> None:
     response = client.post(
         "/api/market/compare",
-        json={"symbols": ["000001"], "range": "3M"},
+        json={"symbols": ["999999"], "range": "3M"},
     )
 
     assert response.status_code == 400

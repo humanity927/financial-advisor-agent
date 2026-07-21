@@ -9,11 +9,14 @@ import SourceStamp from '../../components/SourceStamp';
 import ReportView from './ReportView';
 import { client, ApiClientError } from '../../api/client';
 import type { ProfileInput } from '../../api/types';
+import type { ChatToolCall } from '../../api/types';
+import { useWorkspace } from '../../app/WorkspaceContext';
 
-const REPORT_TIMEOUT_MS = 65_000;
+const REPORT_TIMEOUT_MS = 130_000;
 
 export default function AdvisorPage() {
-  const [symbols, setSymbols] = useState<string[]>(['510300', '511010', '518880', '511880']);
+  const workspace = useWorkspace();
+  const [symbols, setSymbols] = useState<string[]>(workspace.selectedSymbols);
   const abortRef = useRef<AbortController | null>(null);
 
   const mutation = useMutation({
@@ -24,7 +27,7 @@ export default function AdvisorPage() {
 
       const timeoutId = setTimeout(() => controller.abort(), REPORT_TIMEOUT_MS);
       try {
-        const res = await client.post<{ content: string; source: string; as_of: string; is_fallback: boolean; warnings: string[] }>(
+        const res = await client.post<{ content: string; source: string; as_of: string; is_fallback: boolean; warnings: string[]; tool_calls: ChatToolCall[] }>(
           '/advisor/report',
           { ...profile, symbols },
           controller.signal,
@@ -38,9 +41,10 @@ export default function AdvisorPage() {
 
   const handleSubmit = useCallback(
     (values: ProfileInput) => {
+      workspace.patchProfile(values);
       mutation.mutate(values);
     },
-    [mutation],
+    [mutation, workspace],
   );
 
   const handleRetry = useCallback(() => {
@@ -55,11 +59,13 @@ export default function AdvisorPage() {
   const isNoModel =
     mutation.isError &&
     mutation.error instanceof ApiClientError &&
-    (mutation.error.code === 'model_unavailable' || mutation.error.code === 'no_api_key');
+    (mutation.error.code === 'model_unavailable' ||
+      mutation.error.code === 'model_configuration_missing' ||
+      mutation.error.code === 'model_auth_failed');
 
   return (
     <div>
-      <SectionHeader title="Agent 咨询报告" subtitle="填写投资者画像，获取 AI 金融咨询服务" />
+      <SectionHeader title="正式咨询报告" subtitle="基于完整画像与四类 MCP 工具结果生成可核验报告" />
 
       <Row gutter={[24, 24]}>
         <Col xs={24} lg={8}>
@@ -68,6 +74,9 @@ export default function AdvisorPage() {
             loading={isLoading}
             symbols={symbols}
             onSymbolsChange={setSymbols}
+            symbolOptions={workspace.watchedSymbols}
+            initialValues={workspace.profile}
+            onValuesChange={workspace.patchProfile}
           />
         </Col>
 
@@ -82,7 +91,7 @@ export default function AdvisorPage() {
             <Card>
               <PageState state="loading" />
               <div style={{ textAlign: 'center', marginTop: 8 }}>
-                <Tag icon={<ClockCircleOutlined />} color="processing">正在生成报告，请耐心等待（最多60秒）</Tag>
+                <Tag icon={<ClockCircleOutlined />} color="processing">正在生成报告并核验工具调用</Tag>
               </div>
             </Card>
           )}
@@ -166,6 +175,14 @@ export default function AdvisorPage() {
                 description="本报告由 AI 生成，仅供参考。历史表现不代表未来收益，配置建议不构成投资建议。投资有风险，决策需谨慎。"
                 style={{ marginBottom: 16 }}
               />
+
+              <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {mutation.data.data.tool_calls.map((call) => (
+                  <Tag color={call.ok ? 'success' : 'error'} key={`${call.tool}-${call.called_at}`}>
+                    {call.tool} · {call.source}
+                  </Tag>
+                ))}
+              </div>
 
               <ReportView content={mutation.data.data.content} />
 

@@ -4,19 +4,24 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 from uuid import uuid4
 
 from mcp.server.fastmcp import FastMCP
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 
+from finance_advisor.agent.tool_audit import audit_tool
 from finance_advisor.allocation.service import build_portfolio_allocation
 from finance_advisor.market.akshare_provider import AkshareProvider
 from finance_advisor.market.cache_provider import CacheProvider
 from finance_advisor.market.fixture_provider import FixtureProvider
 from finance_advisor.market.models import MarketSeries
 from finance_advisor.market.service import MarketService
-from finance_advisor.market.symbols import SymbolValidationError, normalize_symbols
+from finance_advisor.market.symbols import (
+    SymbolValidationError,
+    get_symbol_catalog,
+    normalize_symbols,
+)
 from finance_advisor.risk.portfolio import PortfolioValidationError
 from finance_advisor.risk.service import (
     InvalidLookbackError,
@@ -111,6 +116,7 @@ def _profile_or_error(**values: Any) -> InvestorProfileInput | dict[str, Any]:
 
 
 @mcp.tool()
+@audit_tool("finance_health")
 def finance_health() -> dict[str, Any]:
     """检查金融MCP、AKShare、缓存目录和离线演示数据是否可用，不请求实时行情。"""
     request_id = str(uuid4())
@@ -125,7 +131,7 @@ def finance_health() -> dict[str, Any]:
             "fixture_path": str(FIXTURE_PATH),
             "fixture_available": service.fixture.available(),
             "force_fixture": service.force_fixture,
-            "supported_symbol_count": 4,
+            "supported_symbol_count": len(get_symbol_catalog().all()),
         }
         return success_response(data, request_id=request_id)
     except Exception:
@@ -138,8 +144,12 @@ def finance_health() -> dict[str, Any]:
 
 
 @mcp.tool()
-def get_market_snapshot(symbols: list[str]) -> dict[str, Any]:
-    """查询1到4个白名单ETF的最近行情；所有价格均来自AKShare、缓存或明确标记的演示数据。"""
+@audit_tool("get_market_snapshot")
+def get_market_snapshot(
+    symbols: list[str],
+    audit_id: Annotated[str | None, Field(min_length=8, max_length=100)] = None,
+) -> dict[str, Any]:
+    """查询1到8个已校验A股指数或ETF；正常模式只返回AKShare或真实行情缓存。"""
     request_id = str(uuid4())
     try:
         normalized = normalize_symbols(symbols)
@@ -160,13 +170,14 @@ def get_market_snapshot(symbols: list[str]) -> dict[str, Any]:
         LOGGER.exception("get_market_snapshot failed request_id=%s", request_id)
         return error_response(
             "market_data_unavailable",
-            "行情查询失败，且缓存与演示数据均不可用",
+            "行情查询失败，AKShare与真实行情缓存均不可用",
             retryable=True,
             request_id=request_id,
         )
 
 
 @mcp.tool()
+@audit_tool("assess_investor_profile")
 def assess_investor_profile(
     amount_cny: float | None = None,
     horizon_months: int | None = None,
@@ -175,6 +186,7 @@ def assess_investor_profile(
     experience: InvestmentExperience | None = None,
     liquidity_need: LiquidityNeed | None = None,
     emergency_fund_months: int | None = None,
+    audit_id: Annotated[str | None, Field(min_length=8, max_length=100)] = None,
 ) -> dict[str, Any]:
     """根据用户明确提供的7项信息计算可复现的风险分数；缺失信息会返回missing_fields。"""
     profile = _profile_or_error(
@@ -192,9 +204,11 @@ def assess_investor_profile(
 
 
 @mcp.tool()
+@audit_tool("analyze_asset_risk")
 def analyze_asset_risk(
     symbols: list[str],
     lookback_days: int = 252,
+    audit_id: Annotated[str | None, Field(min_length=8, max_length=100)] = None,
 ) -> dict[str, Any]:
     """使用历史收盘价计算年化收益、波动率、最大回撤、95% VaR和CVaR；不预测未来。"""
     request_id = str(uuid4())
@@ -230,6 +244,7 @@ def analyze_asset_risk(
 
 
 @mcp.tool()
+@audit_tool("analyze_portfolio_risk")
 def analyze_portfolio_risk(
     weights_pct: dict[str, PortfolioWeight],
     lookback_days: int = 252,
@@ -275,6 +290,7 @@ def analyze_portfolio_risk(
 
 
 @mcp.tool()
+@audit_tool("build_allocation")
 def build_allocation(
     amount_cny: float | None = None,
     horizon_months: int | None = None,
@@ -283,6 +299,7 @@ def build_allocation(
     experience: InvestmentExperience | None = None,
     liquidity_need: LiquidityNeed | None = None,
     emergency_fund_months: int | None = None,
+    audit_id: Annotated[str | None, Field(min_length=8, max_length=100)] = None,
 ) -> dict[str, Any]:
     """根据完整用户画像生成透明、确定性的四类资产配置，不执行交易。"""
     profile = _profile_or_error(

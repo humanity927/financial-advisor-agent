@@ -69,7 +69,18 @@ def test_success_uses_fixed_cli_args_and_isolated_home(
     report = _adapter(tmp_path).generate_report("生成教学报告")
 
     assert report == "报告内容"
-    assert captured["args"] == ["hermes", "--toolsets", "finance", "--oneshot", "生成教学报告"]
+    assert captured["args"] == [
+        "hermes",
+        "chat",
+        "--query",
+        "生成教学报告",
+        "--toolsets",
+        "finance",
+        "--quiet",
+        "--yolo",
+        "--source",
+        "tool",
+    ]
     assert captured["kwargs"]["shell"] is False
     assert captured["kwargs"]["cwd"] == str(tmp_path.resolve())
     env = captured["kwargs"]["env"]

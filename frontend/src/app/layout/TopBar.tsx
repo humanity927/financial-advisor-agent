@@ -16,6 +16,7 @@ export default function TopBar() {
   return (
     <div
       data-testid="system-topbar"
+      className="shell-topbar"
       style={{
         position: 'fixed',
         top: 0,

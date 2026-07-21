@@ -33,7 +33,21 @@ test.describe('Market Page', () => {
     await expect
       .poll(() => compareRequests.some((item) => item.symbols.length === 3 && !item.symbols.includes('511010')))
       .toBe(true);
-    await expect(page.getByText('已选 3 / 4 个标的')).toBeVisible();
+    await expect(page.getByText('已选 3 / 4 个关注标的')).toBeVisible();
+  });
+
+  test('searches, adds, rejects duplicates, and removes watched symbols', async ({ page }) => {
+    await page.goto('/market');
+    const search = page.getByPlaceholder('输入代码或名称');
+    await search.fill('000001');
+    await search.press('Enter');
+    await expect(page.getByText('000001 · 上证指数')).toBeVisible();
+    await page.getByRole('button', { name: '关注 000001' }).click();
+    await expect(page.getByText('已选 5 / 5 个关注标的')).toBeVisible();
+    await page.getByRole('button', { name: '关注 000001' }).click();
+    await expect(page.getByText('000001 已在关注列表')).toBeVisible();
+    await page.getByRole('button', { name: '删除 000001' }).click();
+    await expect(page.getByText('已选 4 / 4 个关注标的')).toBeVisible();
   });
 
   test('shows validation state when no symbol is selected', async ({ page }) => {

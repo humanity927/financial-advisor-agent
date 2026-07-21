@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const frontendRoot = fileURLToPath(new URL('..', import.meta.url));
+const apiPort = Number(process.env.FINANCE_E2E_API_PORT ?? 8123);
 
 async function loadFixture(name) {
   const file = join(frontendRoot, 'mock', name);
@@ -24,11 +25,25 @@ const advisorResponse = {
   ok: true,
   data: {
     content:
-      '# 用户画像\n\n这是 fixture E2E 报告。\n\n# 行情摘要\n\n使用演示数据。\n\n# 风险指标\n\n仅展示历史统计。\n\n# 配置建议\n\n请结合自身情况审慎决策。\n\n# 建议原因\n\n基于确定性规则。\n\n# 数据时间与来源\n\n来源：fixture。\n\n# 风险提示\n\n历史表现不代表未来收益。',
+      '## 用户画像\n\n这是 fixture E2E 报告。\n\n## 行情摘要\n\n使用演示数据。\n\n## 风险指标\n\n仅展示历史统计。\n\n## 配置建议\n\n请结合自身情况审慎决策。\n\n## 建议原因\n\n基于确定性规则。\n\n## 数据时间与来源\n\n来源：fixture。\n\n## 风险提示\n\n历史表现不代表未来收益。',
     source: 'fixture',
     as_of: '2026-07-17',
     is_fallback: true,
     warnings: ['演示数据/非实时数据'],
+    tool_calls: [
+      'assess_investor_profile',
+      'get_market_snapshot',
+      'analyze_asset_risk',
+      'build_allocation',
+    ].map((tool) => ({
+      tool,
+      called_at: '2026-07-21T10:00:00+08:00',
+      ok: true,
+      source: tool === 'get_market_snapshot' || tool === 'analyze_asset_risk' ? 'fixture' : 'system',
+      as_of: '2026-07-17',
+      error_code: null,
+      summary: {},
+    })),
   },
   meta: {
     source: 'fixture',
@@ -38,6 +53,80 @@ const advisorResponse = {
   },
   warnings: ['演示数据/非实时数据'],
 };
+
+const catalogItems = [
+  { symbol: '510300', name: '沪深300ETF', asset_class: '股票', market: 'SH', asset_type: 'etf', provider_symbol: null },
+  { symbol: '511010', name: '国债ETF', asset_class: '债券', market: 'SH', asset_type: 'etf', provider_symbol: null },
+  { symbol: '518880', name: '黄金ETF', asset_class: '黄金', market: 'SH', asset_type: 'etf', provider_symbol: null },
+  { symbol: '511880', name: '货币ETF', asset_class: '现金', market: 'SH', asset_type: 'etf', provider_symbol: null },
+  { symbol: '000001', name: '上证指数', asset_class: '股票', market: 'SH', asset_type: 'index', provider_symbol: 'sh000001' },
+];
+const sessions = new Map();
+
+function envelope(data, source = 'system') {
+  return {
+    ok: true,
+    data,
+    meta: {
+      source,
+      as_of: '2026-07-21T10:00:00+08:00',
+      request_id: `e2e-${Date.now()}`,
+      is_fallback: source === 'fixture',
+    },
+    warnings: [],
+  };
+}
+
+function newSession(title = '新咨询') {
+  const now = new Date().toISOString();
+  const session = {
+    id: crypto.randomUUID(),
+    title,
+    created_at: now,
+    updated_at: now,
+    profile: {},
+    symbols: [],
+    risk_symbol: null,
+    current_allocation_pct: null,
+    messages: [],
+  };
+  sessions.set(session.id, session);
+  return session;
+}
+
+function chatTurn(session, content) {
+  const now = new Date().toISOString();
+  const profile = {
+    amount_cny: 100000,
+    horizon_months: 24,
+    max_loss_pct: 15,
+    income_stability: 'stable',
+    experience: 'basic',
+    liquidity_need: 'medium',
+    emergency_fund_months: 6,
+  };
+  const actions = [
+    { type: 'profile.patch', payload: profile },
+    { type: 'market.symbol.add', payload: { symbol: '510300' } },
+    { type: 'risk.symbol.select', payload: { symbol: '510300' } },
+  ];
+  const user = {
+    id: crypto.randomUUID(), role: 'user', content, created_at: now, status: 'complete',
+    source: 'system', as_of: null, is_fallback: false, tool_calls: [], actions: [],
+  };
+  const assistant = {
+    id: crypto.randomUUID(), role: 'assistant', content: advisorResponse.data.content,
+    created_at: now, status: 'complete', source: 'fixture', as_of: '2026-07-17',
+    is_fallback: true, tool_calls: advisorResponse.data.tool_calls, actions,
+  };
+  session.title = content.slice(0, 24);
+  session.profile = profile;
+  session.symbols = ['510300'];
+  session.risk_symbol = '510300';
+  session.messages.push(user, assistant);
+  session.updated_at = now;
+  return { session, message: assistant, missing_fields: [], actions };
+}
 
 function sendJson(response, status, payload) {
   response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -111,6 +200,14 @@ const server = createServer(async (request, response) => {
     sendJson(response, 200, fixtures.marketSnapshot);
     return;
   }
+  if (request.method === 'GET' && url.pathname === '/api/market/catalog/search') {
+    const query = (url.searchParams.get('q') ?? '').toLowerCase();
+    const items = catalogItems.filter(
+      (item) => item.symbol.includes(query) || item.name.toLowerCase().includes(query),
+    );
+    sendJson(response, 200, envelope({ items, catalog_fetched_at: '2026-07-21T09:00:00+08:00', query }, 'akshare'));
+    return;
+  }
   if (request.method === 'POST' && url.pathname === '/api/market/compare') {
     const body = await readJsonBody(request);
     const result = filterMarketCompare(fixtures.marketCompare, body.symbols);
@@ -137,6 +234,72 @@ const server = createServer(async (request, response) => {
     sendJson(response, 200, advisorResponse);
     return;
   }
+  if (request.method === 'POST' && url.pathname === '/api/sessions') {
+    const body = await readJsonBody(request);
+    sendJson(response, 200, envelope(newSession(String(body.title ?? '新咨询'))));
+    return;
+  }
+  if (request.method === 'GET' && url.pathname === '/api/sessions') {
+    const items = Array.from(sessions.values()).map((session) => ({
+      id: session.id,
+      title: session.title,
+      created_at: session.created_at,
+      updated_at: session.updated_at,
+      message_count: session.messages.length,
+      symbols: session.symbols,
+      profile_fields: Object.keys(session.profile).length,
+    }));
+    sendJson(response, 200, envelope({ sessions: items }));
+    return;
+  }
+  if (request.method === 'DELETE' && url.pathname === '/api/sessions') {
+    const deleted = sessions.size;
+    sessions.clear();
+    sendJson(response, 200, envelope({ deleted }));
+    return;
+  }
+  const sessionMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)$/);
+  if (sessionMatch && request.method === 'GET') {
+    const session = sessions.get(sessionMatch[1]);
+    if (session) {
+      sendJson(response, 200, envelope(session));
+    } else {
+      sendJson(response, 404, { ok: false, data: null, meta: envelope(null).meta, warnings: [], error: { code: 'session_not_found', message: '会话不存在', retryable: false } });
+    }
+    return;
+  }
+  if (sessionMatch && request.method === 'DELETE') {
+    const deleted = sessions.delete(sessionMatch[1]);
+    sendJson(response, deleted ? 200 : 404, deleted ? envelope({ deleted: true }) : { ok: false, data: null, meta: envelope(null).meta, warnings: [], error: { code: 'session_not_found', message: '会话不存在', retryable: false } });
+    return;
+  }
+  const messageMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/messages$/);
+  if (messageMatch && request.method === 'POST') {
+    const session = sessions.get(messageMatch[1]);
+    const body = await readJsonBody(request);
+    if (!session) {
+      sendJson(response, 404, { ok: false, data: null, meta: envelope(null).meta, warnings: [], error: { code: 'session_not_found', message: '会话不存在', retryable: false } });
+      return;
+    }
+    sendJson(response, 200, envelope(chatTurn(session, String(body.content ?? '')), 'fixture'));
+    return;
+  }
+  const regenerateMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/regenerate$/);
+  if (regenerateMatch && request.method === 'POST') {
+    const session = sessions.get(regenerateMatch[1]);
+    if (session) {
+      const content = session.messages.findLast((item) => item.role === 'user')?.content ?? '重新生成';
+      session.messages = session.messages.slice(0, -2);
+      sendJson(response, 200, envelope(chatTurn(session, content), 'fixture'));
+    } else {
+      sendJson(response, 404, { ok: false, data: null, meta: envelope(null).meta, warnings: [], error: { code: 'session_not_found', message: '会话不存在', retryable: false } });
+    }
+    return;
+  }
+  if (request.method === 'POST' && url.pathname.startsWith('/api/advisor/runs/')) {
+    sendJson(response, 200, envelope({ cancelled: true }));
+    return;
+  }
 
   sendJson(response, 404, {
     ok: false,
@@ -158,8 +321,8 @@ server.on('connection', (socket) => {
   socket.on('close', () => sockets.delete(socket));
 });
 
-server.listen(8123, '127.0.0.1', () => {
-  console.log('fixture mock API listening on http://127.0.0.1:8123');
+server.listen(apiPort, '127.0.0.1', () => {
+  console.log(`fixture mock API listening on http://127.0.0.1:${apiPort}`);
 });
 
 function shutdown() {

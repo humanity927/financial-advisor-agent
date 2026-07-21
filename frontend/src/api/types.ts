@@ -92,3 +92,85 @@ export interface HealthStatus {
   force_fixture: boolean;
   supported_symbol_count: number;
 }
+
+export interface CatalogSymbol {
+  symbol: string;
+  name: string;
+  asset_class: string;
+  market: 'SH' | 'SZ';
+  asset_type: 'etf' | 'index';
+  provider_symbol: string | null;
+}
+
+export interface CatalogSearchData {
+  items: CatalogSymbol[];
+  catalog_fetched_at: string | null;
+  query: string;
+}
+
+export type ProfilePatch = Partial<ProfileInput>;
+
+export type UiAction =
+  | { type: 'profile.patch'; payload: ProfilePatch }
+  | { type: 'market.symbol.add'; payload: { symbol: string } }
+  | { type: 'market.symbol.remove'; payload: { symbol: string } }
+  | { type: 'risk.symbol.select'; payload: { symbol: string } }
+  | {
+      type: 'portfolio.inputs.patch';
+      payload: {
+        profile?: ProfilePatch | null;
+        current_allocation_pct?: Record<string, number> | null;
+      };
+    };
+
+export interface ChatToolCall {
+  tool: string;
+  called_at: string;
+  ok: boolean;
+  source: string;
+  as_of: string | null;
+  error_code: string | null;
+  summary: Record<string, unknown>;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  created_at: string;
+  status: 'complete' | 'error' | 'cancelled';
+  source: string;
+  as_of: string | null;
+  is_fallback: boolean;
+  tool_calls: ChatToolCall[];
+  actions: UiAction[];
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  profile: ProfilePatch;
+  symbols: string[];
+  risk_symbol: string | null;
+  current_allocation_pct: Record<string, number> | null;
+  messages: ChatMessage[];
+}
+
+export interface ChatTurnData {
+  session: ChatSession;
+  message: ChatMessage;
+  missing_fields: string[];
+  actions: UiAction[];
+}
+
+export interface SessionSummary {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  symbols: string[];
+  profile_fields: number;
+}

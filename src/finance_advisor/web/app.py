@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from finance_advisor.market.symbols import get_symbol_catalog
 from finance_advisor.schemas import error_response, success_response
 from finance_advisor.web.common import (
     PROJECT_ROOT,
@@ -18,7 +19,7 @@ from finance_advisor.web.common import (
     get_fixture_path,
     get_market_service,
 )
-from finance_advisor.web.routes import advisor, market, portfolio, risk
+from finance_advisor.web.routes import advisor, market, portfolio, risk, sessions
 
 
 def _sanitize_validation_errors(exc: RequestValidationError) -> list[dict[str, Any]]:
@@ -131,7 +132,7 @@ def create_app(static_dir: Path | None = None) -> FastAPI:
                 "fixture_path": str(fixture_path),
                 "fixture_available": service.fixture.available(),
                 "force_fixture": service.force_fixture,
-                "supported_symbol_count": 4,
+                "supported_symbol_count": len(get_symbol_catalog().all()),
                 "frontend_dist": str(resolved_static_dir),
                 "frontend_available": (resolved_static_dir / "index.html").is_file(),
             },
@@ -142,6 +143,7 @@ def create_app(static_dir: Path | None = None) -> FastAPI:
     app.include_router(risk.router, prefix="/api/risk", tags=["Risk"])
     app.include_router(portfolio.router, prefix="/api/portfolio", tags=["Portfolio"])
     app.include_router(advisor.router, prefix="/api/advisor", tags=["Advisor"])
+    app.include_router(sessions.router, prefix="/api/sessions", tags=["Sessions"])
 
     has_frontend = (resolved_static_dir / "index.html").is_file()
     assets_dir = resolved_static_dir / "assets"

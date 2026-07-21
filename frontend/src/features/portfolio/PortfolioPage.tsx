@@ -26,6 +26,7 @@ import SourceStamp from '../../components/SourceStamp';
 import { client, ApiClientError } from '../../api/client';
 import type { PortfolioPlanResult, ProfileInput } from '../../api/types';
 import './PortfolioPage.css';
+import { useWorkspace } from '../../app/WorkspaceContext';
 
 const ASSETS = [
   { key: '现金', label: '现金', color: '#2B7BD6' },
@@ -91,9 +92,10 @@ function deviationTag(value: number | null) {
 }
 
 export default function PortfolioPage() {
+  const workspace = useWorkspace();
   const [compareCurrent, setCompareCurrent] = useState(true);
   const [currentAllocation, setCurrentAllocation] = useState<Record<string, number>>(
-    DEFAULT_CURRENT_ALLOCATION,
+    workspace.currentAllocationPct ?? DEFAULT_CURRENT_ALLOCATION,
   );
 
   const currentTotal = useMemo(
@@ -119,8 +121,10 @@ export default function PortfolioPage() {
         profile: values,
         currentAllocationPct: compareCurrent ? { ...currentAllocation } : null,
       });
+      workspace.patchProfile(values);
+      workspace.setCurrentAllocationPct(compareCurrent ? { ...currentAllocation } : null);
     },
-    [compareCurrent, currentAllocation, currentTotalValid, mutation],
+    [compareCurrent, currentAllocation, currentTotalValid, mutation, workspace],
   );
 
   const plan = mutation.data?.data;
@@ -271,6 +275,8 @@ export default function PortfolioPage() {
         <div className="portfolio-stack">
           <ProfileForm
             onSubmit={handleSubmit}
+            initialValues={workspace.profile}
+            onValuesChange={workspace.patchProfile}
             loading={mutation.isPending}
             submitLabel="生成配置方案"
             submitTestId="portfolio-submit"

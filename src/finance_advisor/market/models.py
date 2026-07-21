@@ -27,6 +27,9 @@ class MarketSeries(BaseModel):
     is_fallback: bool = False
     origin_source: MarketSource | None = None
     warning: str | None = None
+    cached_at: str | None = None
+    cache_age_seconds: int | None = Field(default=None, ge=0)
+    is_stale: bool = False
 
     def snapshot(self) -> dict[str, object]:
         latest = self.bars[-1]
@@ -44,4 +47,7 @@ class MarketSeries(BaseModel):
             "origin_source": self.origin_source,
             "is_fallback": self.is_fallback,
             "warning": self.warning,
+            "fetched_at": self.fetched_at,
+            "cached_at": self.cached_at,
+            "is_stale": self.is_stale,
         }

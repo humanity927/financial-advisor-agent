@@ -45,6 +45,7 @@ import type {
   RiskProfileData,
 } from './types';
 import './RiskPage.css';
+import { useWorkspace } from '../../app/WorkspaceContext';
 
 const { Text, Title } = Typography;
 const SYMBOL_OPTIONS = [
@@ -53,7 +54,6 @@ const SYMBOL_OPTIONS = [
   { value: '518880', label: '518880 · 黄金ETF' },
   { value: '511880', label: '511880 · 货币ETF' },
 ];
-const DEFAULT_SYMBOLS = SYMBOL_OPTIONS.map((item) => item.value);
 const DEFAULT_WEIGHTS: Record<string, number> = {
   '510300': 40,
   '511010': 30,
@@ -251,6 +251,7 @@ function PortfolioResult({
 }
 
 function ProfilePanel() {
+  const workspace = useWorkspace();
   const mutation = useMutation({
     mutationKey: queryKeys.riskProfile,
     mutationFn: (values: ProfileInput) => client.post<RiskProfileData>('/risk/profile', values),
@@ -258,7 +259,7 @@ function ProfilePanel() {
   const response = mutation.data;
   return (
     <Row gutter={[24, 24]}>
-      <Col xs={24} lg={8}><ProfileForm onSubmit={(values) => mutation.mutate(values)} loading={mutation.isPending} submitLabel="评估风险画像" submitTestId="risk-profile-submit" /></Col>
+      <Col xs={24} lg={8}><ProfileForm onSubmit={(values) => { workspace.patchProfile(values); mutation.mutate(values); }} initialValues={workspace.profile} onValuesChange={workspace.patchProfile} loading={mutation.isPending} submitLabel="评估风险画像" submitTestId="risk-profile-submit" /></Col>
       <Col xs={24} lg={16}>
         {mutation.isPending && <PageState state="loading" />}
         {mutation.isError && <PageState state="error" error={mutation.error instanceof Error ? mutation.error.message : '风险画像请求失败'} onRetry={() => mutation.variables && mutation.mutate(mutation.variables)} />}
@@ -271,7 +272,14 @@ function ProfilePanel() {
 }
 
 function AssetPanel() {
-  const [symbols, setSymbols] = useState(DEFAULT_SYMBOLS);
+  const workspace = useWorkspace();
+  const symbolOptions = workspace.watchedSymbols.map((item) => ({
+    value: item.symbol,
+    label: `${item.symbol} · ${item.name}`,
+  }));
+  const [symbols, setSymbols] = useState(
+    workspace.riskSymbol ? [workspace.riskSymbol] : workspace.selectedSymbols.slice(0, 4),
+  );
   const [lookbackDays, setLookbackDays] = useState(252);
   const mutation = useMutation({
     mutationKey: queryKeys.riskAssets,
@@ -282,7 +290,7 @@ function AssetPanel() {
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <Card className="risk-control-card" title={<span className="risk-card-title"><Waves size={18} />资产风险参数</span>}>
         <Space wrap className="risk-control-row">
-          <Select aria-label="风险分析标的" mode="multiple" value={symbols} onChange={setSymbols} options={SYMBOL_OPTIONS} maxCount={4} className="risk-symbol-select" />
+          <Select aria-label="风险分析标的" mode="multiple" value={symbols} onChange={(values) => { setSymbols(values); workspace.setRiskSymbol(values[0] ?? null); }} options={symbolOptions} maxCount={4} className="risk-symbol-select" />
           <InputNumber aria-label="资产风险回看交易日" min={60} max={1260} precision={0} value={lookbackDays} onChange={(value) => value !== null && setLookbackDays(value)} addonAfter="交易日" />
           <Button type="primary" icon={<Calculator size={15} />} onClick={() => mutation.mutate({ symbols, lookback_days: lookbackDays })} loading={mutation.isPending} disabled={symbols.length === 0} data-testid="risk-assets-submit">计算资产风险</Button>
         </Space>
