@@ -13,6 +13,7 @@ async function loadFixture(name) {
 const fixtures = {
   health: await loadFixture('health.json'),
   marketSnapshot: await loadFixture('market-snapshot.json'),
+  marketCompare: await loadFixture('market-compare.json'),
   portfolioPlan: await loadFixture('portfolio-plan.json'),
   riskProfile: await loadFixture('risk-profile.json'),
   riskPortfolio: await loadFixture('risk-portfolio.json'),
@@ -42,7 +43,63 @@ function sendJson(response, status, payload) {
   response.end(JSON.stringify(payload));
 }
 
-const server = createServer((request, response) => {
+async function readJsonBody(request) {
+  const chunks = [];
+  for await (const chunk of request) {
+    chunks.push(chunk);
+  }
+  if (chunks.length === 0) {
+    return {};
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function filterMarketCompare(payload, symbols) {
+  const available = new Set(payload.data.symbols.map((item) => item.symbol));
+  const requested = Array.isArray(symbols) && symbols.length > 0
+    ? symbols.map(String)
+    : payload.data.symbols.map((item) => item.symbol);
+  const invalid = requested.find((symbol) => !available.has(symbol));
+  if (invalid) {
+    return {
+      status: 400,
+      payload: {
+        ok: false,
+        data: null,
+        meta: {
+          source: 'system',
+          as_of: new Date().toISOString(),
+          request_id: 'e2e-invalid-symbol',
+          is_fallback: false,
+        },
+        warnings: [],
+        error: { code: 'invalid_symbol', message: `不支持的标的代码：${invalid}`, retryable: false },
+      },
+    };
+  }
+
+  const wanted = new Set(requested);
+  return {
+    status: 200,
+    payload: {
+      ...payload,
+      data: {
+        ...payload.data,
+        symbols: payload.data.symbols.filter((item) => wanted.has(item.symbol)),
+        normalized_series: payload.data.normalized_series.filter((item) => wanted.has(item.symbol)),
+        interval_returns: payload.data.interval_returns.filter((item) => wanted.has(item.symbol)),
+        snapshots: payload.data.snapshots.filter((item) => wanted.has(item.symbol)),
+        source_details: payload.data.source_details.filter((item) => wanted.has(item.symbol)),
+      },
+    },
+  };
+}
+
+const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? '/', 'http://127.0.0.1:8123');
 
   if (request.method === 'GET' && url.pathname === '/api/health') {
@@ -51,6 +108,12 @@ const server = createServer((request, response) => {
   }
   if (request.method === 'GET' && url.pathname === '/api/market/snapshot') {
     sendJson(response, 200, fixtures.marketSnapshot);
+    return;
+  }
+  if (request.method === 'POST' && url.pathname === '/api/market/compare') {
+    const body = await readJsonBody(request);
+    const result = filterMarketCompare(fixtures.marketCompare, body.symbols);
+    sendJson(response, result.status, result.payload);
     return;
   }
   if (request.method === 'POST' && url.pathname === '/api/portfolio/plan') {
@@ -84,12 +147,22 @@ const server = createServer((request, response) => {
   });
 });
 
+const sockets = new Set();
+server.on('connection', (socket) => {
+  sockets.add(socket);
+  socket.on('close', () => sockets.delete(socket));
+});
+
 server.listen(8123, '127.0.0.1', () => {
   console.log('fixture mock API listening on http://127.0.0.1:8123');
 });
 
 function shutdown() {
+  for (const socket of sockets) {
+    socket.destroy();
+  }
   server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 500).unref();
 }
 
 process.on('SIGINT', shutdown);
