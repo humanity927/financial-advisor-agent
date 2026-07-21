@@ -16,6 +16,7 @@ const fixtures = {
   portfolioPlan: await loadFixture('portfolio-plan.json'),
   riskProfile: await loadFixture('risk-profile.json'),
   riskPortfolio: await loadFixture('risk-portfolio.json'),
+  riskAssets: await loadFixture('risk-assets.json'),
 };
 
 const advisorResponse = {
@@ -63,6 +64,10 @@ const server = createServer((request, response) => {
   }
   if (request.method === 'POST' && url.pathname === '/api/risk/portfolio') {
     sendJson(response, 200, fixtures.riskPortfolio);
+    return;
+  }
+  if (request.method === 'POST' && url.pathname === '/api/risk/assets') {
+    sendJson(response, 200, fixtures.riskAssets);
     return;
   }
   if (request.method === 'POST' && url.pathname === '/api/advisor/report') {

@@ -1,263 +1,255 @@
-# 4号交付说明：风险实验室与风险 MCP
+# 4号交接说明：风险实验室与风险 MCP
 
 > 负责人：4号成员  
 > 分支：`feat/risk-lab-mcp`  
-> 最近核验：2026-07-20  
-> 状态：风险核心与 MCP 已完成；FastAPI 路由和前端页面等待公共骨架后接入  
-> 数据边界：仅做历史统计和教学演示，不预测未来，不构成投资建议
+> 基线：`main@1231474`；依赖 3 号 Web 骨架：`6f26abc`
+> 文档更新时间：2026-07-21
+> 状态：风险后端 API、风险实验室页面、fixture、定向测试已完成；合并与真实服务联调结果见本文第 8 节。
+> 数据边界：只做历史统计和教学演示，不预测未来，不执行交易，不构成投资建议。
 
-## 1. 交付目标
+## 1. 本次交付
 
-本模块回答三个问题：
+本部分把原来的风险核心和 MCP 工具接入了 Web 工作台，完成了以下用户流程：
 
-1. 用户的六维风险画像是什么；
-2. 多个白名单 ETF 的历史收益相关性如何；
-3. 给定非负且合计 100% 的资产权重后，组合历史收益、波动、回撤、VaR 和 CVaR 如何。
+1. 在“风险画像”页提交七项用户信息，查看确定性的风险分数、风险等级、六维得分和硬约束。
+2. 在“资产风险”页选择 1 到 4 个白名单 ETF，查看年化收益、年化波动率、最大回撤、95% VaR/CVaR 和观测数。
+3. 在“组合风险”页调整四类 ETF 的固定权重，查看组合指标、权重、相关性矩阵、净值曲线和回撤曲线。
+4. 所有数据都显示来源、时间和回退/演示状态；请求失败、数据不足和部分数据告警都有独立界面状态。
 
-大模型不参与金融数值计算。确定性 Python 函数生成全部指标，Hermes 只负责调用 MCP 工具和解释结果。
+大模型不参与金融数值计算。Python 确定性函数产生风险指标，Agent/MCP 只负责工具调用和文字解释。
 
-## 2. 调用关系
+## 2. 调用链
 
 ```text
-Hermes Agent
-  -> finance MCP: analyze_portfolio_risk
-     -> 白名单代码与权重校验
-     -> MarketService.get_history
-        -> AKShare / cache / fixture
-     -> calculate_portfolio_risk
-        -> 共同交易日对齐
-        -> 各资产日收益与 Pearson 相关系数
-        -> 固定权重组合日收益
-        -> 组合净值与回撤曲线
-        -> 复用 calculate_risk_metrics
-     -> success_response / error_response
+浏览器 /risk
+  -> frontend/src/features/risk/RiskPage.tsx
+  -> frontend/src/api/client.ts
+  -> FastAPI /api/risk/{profile|assets|portfolio}
+  -> web/routes/risk.py
+  -> MarketService
+     -> AKShare -> cache -> data/fixtures/market_data.json
+  -> risk/profile.py、risk/metrics.py、risk/portfolio.py
+  -> 统一 envelope 返回前端
+  -> 风险画像、指标表、相关性表、净值/回撤图
 ```
 
-后续 FastAPI 风险路由应直接复用领域函数和统一响应结构，不在前端或 route 中复制金融公式。
+MCP 仍然走原有链路：
 
-## 3. 已修改文件
+```text
+Hermes Agent -> finance MCP -> assess_investor_profile /
+analyze_asset_risk / analyze_portfolio_risk -> 确定性风险函数
+```
 
-| 文件 | 变更 |
+Web 路由没有反向 import MCP server，避免把 stdio 协议层和 HTTP 层耦合。
+
+## 3. 修改文件
+
+### 3.1 4号业务实现
+
+| 文件 | 作用 |
 |---|---|
-| `src/finance_advisor/risk/portfolio.py` | 新增权重校验、共同日期对齐、相关矩阵、组合净值、回撤和组合指标 |
-| `src/finance_advisor/risk/profile.py` | 新增六维画像最大分值和图表数据，不修改原评分权重 |
-| `src/finance_advisor/mcp_server.py` | 注册 `analyze_portfolio_risk`，补充画像 `dimensions` 字段 |
-| `config/hermes-config.template.yaml` | 将新工具加入 finance 工具白名单 |
-| `tests/test_portfolio_risk.py` | 新增组合算法、边界、相关性和样本不足测试 |
-| `tests/test_profile.py` | 验证六维得分与原总分一致，维度满分合计 100 |
-| `tests/test_mcp_tools.py` | 验证正常、无效权重、fixture 与样本不足响应 |
-| `tests/test_mcp_protocol.py` | 通过真实 stdio MCP 子进程发现并调用新工具 |
+| `src/finance_advisor/web/routes/risk.py` | 新增画像、单资产风险、组合风险三个 HTTP 路由；复用现有风险领域函数和统一响应结构 |
+| `frontend/src/features/risk/RiskPage.tsx` | 风险实验室页面，包含三个 Tab、表单、状态、指标表、相关性表和 ECharts 曲线 |
+| `frontend/src/features/risk/types.ts` | 风险页面的 API 类型；兼容后端正式组合结构和已有 fixture 结构 |
+| `tests/test_web_risk.py` | 五项风险 Web API 定向测试 |
+| `frontend/e2e/risk.spec.ts` | 画像、资产风险、组合风险三个真实浏览器流程 |
+| `frontend/mock/risk-assets.json` | 资产风险 fixture，明确标记为演示数据 |
 
-没有修改 `vendor/hermes-agent`、行情提供器、资产配置算法、模型密钥或运行时数据。
+### 3.2 必要的共享接线
 
-## 4. 计算口径
+| 文件 | 变更原因 |
+|---|---|
+| `frontend/src/App.tsx` | 将 `/risk` 从占位页替换为 `RiskPage` |
+| `frontend/e2e/mock-api.mjs` | 为前端 E2E 增加 `/api/risk/assets` fixture 路由 |
+| `frontend/e2e/ui-shell.spec.ts` | 将风险导航断言从占位文本改为真实页面标题 |
 
-### 4.1 数据清洗与对齐
+本分支还合入了已推送的基础依赖：2号前端 `main@1231474` 和 3号 Web 骨架 `6f26abc`。没有修改 `vendor/hermes-agent`，没有读取或写入密钥。
 
-- 只接受有限且大于 0 的收盘价；
-- 同一资产同一日期重复时保留最后一个有效值；
-- 多资产只使用全部标的共同拥有的日期；
-- 至少需要 60 个共同有效收盘价；
-- 不使用未来数据，不对缺失日期进行前向填充。
+## 4. HTTP 接口契约
 
-### 4.2 权重
+所有接口均返回项目统一 envelope：`ok`、`data`、`meta`、`warnings`；失败时增加 `error.code`、`error.message` 和 `error.retryable`。
 
-- 每项权重必须是非负有限数值；
-- 权重合计必须为 `100%`，绝对误差不超过 `1e-6`；
-- 资产代码与权重键必须一一对应；
-- 允许 0% 权重资产参与相关性比较；
-- 组合采用固定权重每日再平衡口径。
+### 4.1 `POST /api/risk/profile`
 
-### 4.3 指标
+请求：
 
-```text
-资产日收益 = 当日收盘价 / 前一共同交易日收盘价 - 1
-组合日收益 = sum(资产日收益 * 权重)
-组合净值 = 前一日组合净值 * (1 + 组合日收益)
-回撤 = 当前净值 / 历史最高净值 - 1
+```json
+{
+  "amount_cny": 50000,
+  "horizon_months": 12,
+  "max_loss_pct": 10,
+  "income_stability": "stable",
+  "experience": "basic",
+  "liquidity_need": "medium",
+  "emergency_fund_months": 6
+}
 ```
 
-- 年化收益：按首尾净值的几何收益折算，年化因子 252；
-- 年化波动率：样本标准差 `ddof=1` 乘 `sqrt(252)`；
-- 最大回撤：组合净值相对历史峰值的最小值；
-- VaR：历史日收益 5% 分位数的损失绝对值；
-- CVaR：低于或等于 VaR 分位点的平均损失；
-- 相关性：共同日期日收益的 Pearson 相关系数；
-- 常数收益序列的交叉相关系数返回 `null` 和 warning，对角线仍为 1。
+成功数据包含：
 
-所有指标描述历史，不外推未来。
+```text
+score
+risk_level
+score_breakdown
+hard_limits
+dimensions[]: dimension / score / max_score
+```
 
-## 5. MCP 工具契约
+### 4.2 `POST /api/risk/assets`
 
-工具名：`analyze_portfolio_risk`
+请求字段：
 
-输入示例：
+```json
+{
+  "symbols": ["510300", "511010"],
+  "lookback_days": 252
+}
+```
+
+限制：标的 1 到 4 个；`lookback_days` 为 60 到 1260。每个资产返回 `metrics`、`source`、`warning`；数据不足时 `metrics` 为 `null`，不会伪造数值。
+
+### 4.3 `POST /api/risk/portfolio`
+
+请求字段：
 
 ```json
 {
   "weights_pct": {
-    "510300": 40.0,
-    "511010": 30.0,
-    "518880": 20.0,
-    "511880": 10.0
+    "510300": 40,
+    "511010": 30,
+    "518880": 20,
+    "511880": 10
   },
   "lookback_days": 252
 }
 ```
 
-限制：
-
-- 支持 1～4 个白名单 ETF；
-- `lookback_days` 范围为 60～1260；
-- 支持代码或既有中文别名，但同一标的不能通过代码和别名重复出现。
-
-成功响应的 `data`：
+权重必须非负、有限、与白名单标的一一对应，合计必须为 100%。成功的 `data.portfolio` 包含：
 
 ```text
-portfolio.weights_pct
-portfolio.portfolio_metrics
-portfolio.correlation_matrix
-portfolio.net_value_curve
-portfolio.drawdown_curve
-portfolio.methodology
-assets[]
-method
+weights_pct
+portfolio_metrics
+correlation_matrix
+net_value_curve
+drawdown_curve
+methodology
 ```
 
-统一元数据继续使用项目既有字段：`source`、`as_of`、`request_id`、`is_fallback` 和 `warnings`。
+共同有效收盘价不足时仍返回 `ok=true`，但 `portfolio=null` 并附明确 warning，方便前端展示“数据不足”。
 
-稳定错误码：
+## 5. 计算口径
 
-| 错误码 | 含义 |
-|---|---|
-| `invalid_symbol` | 存在非白名单标的 |
-| `invalid_weights` | 权重为空、重复、非有限、为负或合计不等于 100% |
-| `invalid_lookback` | 回看天数不在 60～1260 |
-| `portfolio_risk_failed` | 历史数据或组合计算发生非预期错误 |
+- 只接受有限且大于 0 的收盘价；重复日期保留最后一个有效值。
+- 多资产只使用全部标的共同拥有的日期，不对缺失日期前向填充。
+- 组合使用固定权重每日再平衡口径。
+- 年化因子为 252 个交易日；波动率使用样本标准差 `ddof=1`。
+- VaR/CVaR 使用历史日收益 5% 分位数，不代表极端事件保护。
+- 相关性为共同日期收益的 Pearson 相关系数；波动不足时返回 `null` 和 warning。
+- 前端只展示 API 返回数字，不自行计算或补造金融数值。
 
-共同样本不足不是协议错误：返回 `ok=true`、`portfolio=null` 和明确 warning，同时保留真实的 cache/fixture 来源信息，方便页面展示“数据不足”状态。
+原有 MCP `analyze_portfolio_risk` 的计算规则保持不变，Web API 直接复用同一领域函数，避免 Web 和 MCP 产生两套公式。
 
-## 6. 前端展示字段
+## 6. 页面状态和安全边界
 
-风险页面可以直接使用以下数据：
+- 画像、资产和组合三个面板都覆盖 loading、empty、API error、retry 和 success。
+- `source=fixture` 或 `is_fallback=true` 时显示演示/回退提示。
+- 组合共同数据不足时展示 partial 状态，不显示虚假曲线或指标。
+- 相关性和风险指标带有历史统计说明；页面不提供交易按钮、买入价、卖出价、收益承诺或预测文案。
+- 报告和 API 错误不向前端暴露 Python traceback。
 
-- `assess_investor_profile.data.dimensions`：六维画像图；
-- `portfolio.portfolio_metrics`：指标摘要；
-- `portfolio.correlation_matrix`：固定 `-1～1` 色域热力图；
-- `portfolio.net_value_curve`：组合净值折线；
-- `portfolio.drawdown_curve`：历史回撤曲线；
-- `assets`：名称、类别、权重、来源和单项 warning；
-- 顶层 `meta` 与 `warnings`：数据时间和降级状态。
+## 7. 本地运行
 
-页面不能仅用红绿表达结果，不能显示原始 JSON，fixture 必须写“演示数据/非实时数据”。
+项目根目录：
 
-## 7. 真实验证记录
+```text
+E:\dingtalk\workspace\项目\financial-advisor-agent
+```
 
-### 7.1 自动化全量验证
-
-已执行：
+安装前端依赖：
 
 ```powershell
-./.venv/Scripts/ruff.exe format --check .
-./.venv/Scripts/ruff.exe check .
-./.venv/Scripts/mypy.exe src
-./.venv/Scripts/pytest.exe --cov=finance_advisor --cov-fail-under=85
-./scripts/verify-hermes.ps1
-./scripts/preflight.ps1
+Set-Location E:\dingtalk\workspace\项目\financial-advisor-agent\frontend
+npm.cmd ci
 ```
 
-最近结果：
+仅看前端 fixture：
 
-- Ruff：通过；
+```powershell
+Set-Location E:\dingtalk\workspace\项目\financial-advisor-agent\frontend
+npm.cmd run e2e
+```
+
+启动包含前端构建的本地 Web：
+
+```powershell
+Set-Location E:\dingtalk\workspace\项目\financial-advisor-agent
+.\scripts\run-app.ps1 -ForceFixture -NoOpen
+```
+
+默认地址：`http://127.0.0.1:8123`。该脚本绑定回环地址，不对公网开放。`-ForceFixture` 仅用于无行情网络时的离线演示，正式数据链路仍按 AKShare、缓存、fixture 顺序工作。
+
+## 8. 验证记录
+
+以下命令已在 2026-07-21 执行：
+
+```powershell
+.\.venv\Scripts\ruff.exe format --check src tests
+.\.venv\Scripts\ruff.exe check src tests
+.\.venv\Scripts\mypy.exe src
+.\.venv\Scripts\pytest.exe tests\test_web_risk.py tests\test_web_app.py tests\test_web_market.py -q
+Set-Location frontend
+npm.cmd ci --no-audit --no-fund
+npm.cmd run typecheck
+npm.cmd run lint
+npm.cmd run build
+npm.cmd run test
+npm.cmd run e2e
+```
+
+结果：
+
+- Ruff format：通过；
+- Ruff lint：通过；
 - strict mypy：通过；
-- pytest：50 项通过；
-- 总覆盖率：87.73%；
-- Hermes：0.18.2 release wheel 与固定 gitlink 校验通过；
-- finance MCP：真实 stdio 连接成功，发现 6 个工具；
-- 模型预检：本机未配置提交所需的模型环境变量，因此按项目规则跳过，不影响金融核心和 MCP 验证。
+- Web 定向测试：12 项通过；
+- 前端 typecheck：通过；
+- 前端 lint：通过；
+- 前端 build：通过；存在约 2.3 MB 主 chunk 的优化提示，不阻断功能；
+- 前端单元测试：12 项通过；
+- 前端 E2E：13 项通过，其中本次新增风险流程 3 项。
 
-### 7.2 4号成员手工复核
+上述前端检查使用 `npm ci` 安装锁定依赖；安装时的 peer/deprecated 警告未导致失败。
 
-2026-07-20，4号成员在独立 PowerShell 终端中亲自执行以下步骤，不依赖开发代理代跑：
+另外已执行完整 Python 覆盖率门禁、`scripts/verify-hermes.ps1` 和 `scripts/preflight.ps1`：66 项测试通过，覆盖率 85.24%，Hermes 固定版本校验通过，preflight 通过；模型 relay 因未配置模型环境变量按项目规则跳过。使用 `scripts/run-app.ps1 -ForceFixture -NoOpen -SkipFrontendBuild` 启动后，HTTP 冒烟结果为：`GET /api/health=200`、`POST /api/risk/profile=200`、`POST /api/risk/assets=200`、`POST /api/risk/portfolio=200`、首页 `GET /=200`。这些是本地 fixture/离线验证，不等同于实时 AKShare 或模型联调。
 
-```powershell
-cd E:\dingtalk\workspace\项目\financial-advisor-agent
-git switch feat/risk-lab-mcp
-git status --short --branch
-./.venv/Scripts/python.exe --version
-./.venv/Scripts/pytest.exe `
-  tests/test_portfolio_risk.py `
-  tests/test_profile.py `
-  tests/test_mcp_tools.py `
-  tests/test_mcp_protocol.py -q
-./scripts/preflight.ps1
-```
-
-手工复核结果：
-
-- 当前分支：`feat/risk-lab-mcp`；
-- 工作区：干净，无未提交文件；
-- Python：3.11.9；
-- 风险相关定向测试：34 项通过，`100%`；
-- finance MCP：真实 stdio 连接成功，用时约 3297ms；
-- 工具发现：6 个，包含 `analyze_portfolio_risk`；
-- 最终状态：`Preflight passed`。
-
-终端中的 `Hermes source checkout is not initialized` 是非阻断警告：本地没有完整上游源码副本，但官方 0.18.2 release wheel 和固定 gitlink SHA 已通过校验。`Primary relay preflight skipped` 表示未配置大模型环境变量，只跳过模型调用，不影响4号风险核心与 MCP 验收。
-
-### 7.3 四资产 fixture 冒烟
-
-四资产 fixture 冒烟结果：
-
-| 项目 | 结果 |
-|---|---:|
-| 权重 | 40% / 30% / 20% / 10% |
-| 共同观测 | 253 |
-| 年化收益 | 2.3325% |
-| 年化波动率 | 3.9856% |
-| 最大回撤 | -3.2517% |
-
-这些数字来自合成 fixture，只用于验证算法和离线演示，不是真实行情结论。
-
-### 7.4 独立公式复算
-
-另外使用 Pandas 独立复算同一组四资产数据，未调用本模块的中间计算函数。对比结果如下：
-
-| 对比项 | 最大绝对差异 |
-|---|---:|
-| 组合净值 | `< 5e-7` |
-| 回撤百分比 | `< 5e-5` |
-| Pearson 相关系数 | `< 2e-7` |
-
-差异来自本模块面向接口输出时的固定小数位舍入，计算方向与独立复算一致。
-
-## 8. 其他成员接入事项
+## 9. 后续成员接入
 
 ### 2号前端
 
-- 使用本文件第 6 节字段，不自行重算指标；
-- 共享画像表单提交后展示 `dimensions`；
-- 为 `portfolio=null`、fixture、cache、partial warning 提供独立状态；
-- 风险页面最终文件放在 `frontend/src/features/risk/**`。
+- `/risk` 已在本分支接入 `RiskPage`；若 2 号后续统一路由，应保留该路由和 `frontend/src/features/risk/**`。
+- 共享 API Client 和 `ApiResponse` envelope 不要复制；新增接口继续使用 `client.post`。
+- 若要改变全局主题或共享组件，单独提交共享文件改动，避免与风险业务混在一起。
 
-### 3号 Web 平台
+### 3号 Web
 
-- FastAPI 公共骨架合并后，将 `POST /api/risk/profile`、`POST /api/risk/assets`、`POST /api/risk/portfolio` 交给4号接入；
-- 提供公共 `MarketService` 依赖或工厂，避免 Web route 从 MCP 层反向 import；
-- 保持项目现有 `success_response` / `error_response`；
-- `pyproject.toml` 中的 FastAPI/Uvicorn 依赖由3号统一维护。
+- 本分支已基于 3 号 Web 骨架实现 `routes/risk.py`；合并时保留 `web/common.py` 的 `MarketService` 工厂和统一异常处理。
+- 不要把风险公式复制到 route；风险计算继续放在 `risk/` 领域模块。
+- FastAPI 依赖和启动脚本沿用 3 号版本。
 
-### 5号 Hermes 报告
+### 5号 Agent 报告
 
-- 在报告约束中明确：组合风险数字只能引用 `analyze_portfolio_risk`；
-- 不把相关性、VaR、CVaR解释成未来预测；
-- 缺少用户权重时先追问或使用确定性配置工具结果，不能让模型自行编造权重。
+- 报告中的组合风险数字只能引用 `analyze_portfolio_risk` 或对应 Web API 返回值。
+- 不把年化收益、相关性、VaR、CVaR解释成未来预测。
+- 缺少用户画像或权重时先追问，不能由模型自行补造。
 
-## 9. 尚未完成与阻塞
+## 10. Git 交付
 
-- FastAPI 风险路由：等待3号公共 Web 骨架和依赖入口；
-- 风险实验室页面：等待2号前端工程、共享组件和 API Client；
-- 风险页面 E2E：等待Vite、Playwright配置；
-- 与最新 `main` 的最终集成：在基础 PR 合并后执行。
+本分支只应提交风险实现、必要的 Web/前端接线、风险测试和本交接文档。提交前检查：
 
-若公共骨架延期，4号可以先提供风险领域处理函数和固定 JSON 契约，但不应重复创建第二套前端框架、API Client或FastAPI应用入口。
+```powershell
+git status --short --branch
+git diff --check
+git diff --cached --stat
+```
+
+当前分支目标：`feat/risk-lab-mcp`。推送后以远程分支最新提交为准；不得把 `.env`、API Key、缓存、`node_modules`、`frontend/dist` 或测试日志提交到仓库。
