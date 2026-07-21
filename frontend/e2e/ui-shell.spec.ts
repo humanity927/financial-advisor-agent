@@ -18,7 +18,8 @@ test.describe('App Shell', () => {
   test('navigates to market page', async ({ page }) => {
     await page.goto('/');
     await page.getByText('行情对比').click();
-    await expect(page.getByText('由功能负责人独立开发中')).toBeVisible();
+    await expect(page.getByRole('heading', { name: '行情对比' })).toBeVisible();
+    await expect(page.getByText('归一化走势', { exact: true })).toBeVisible();
   });
 
   test('navigates to risk page', async ({ page }) => {

@@ -25,9 +25,13 @@ if ($ForceFixture) {
     $env:FINANCE_FORCE_FIXTURE = "1"
 }
 
-if ((Test-Path $FrontendPackage) -and -not (Test-Path (Join-Path $FrontendDist "index.html"))) {
+if (Test-Path $FrontendPackage) {
     if ($SkipFrontendBuild) {
-        Write-Warning "frontend/dist 不存在，已按参数跳过前端构建"
+        if (-not (Test-Path (Join-Path $FrontendDist "index.html"))) {
+            Write-Warning "frontend/dist 不存在，已按参数跳过前端构建"
+        } else {
+            Write-Host "Reusing existing frontend build (-SkipFrontendBuild)." -ForegroundColor DarkYellow
+        }
     } else {
         Push-Location $FrontendDir
         try {
@@ -38,7 +42,7 @@ if ((Test-Path $FrontendPackage) -and -not (Test-Path (Join-Path $FrontendDist "
             Pop-Location
         }
     }
-} elseif (-not (Test-Path $FrontendPackage)) {
+} else {
     Write-Warning "未找到 frontend/package.json；将仅启动 FastAPI 后端和占位启动页"
 }
 

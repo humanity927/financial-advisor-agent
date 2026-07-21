@@ -1,8 +1,12 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import AppShell from './app/layout/AppShell';
 import OverviewPage from './features/overview/OverviewPage';
 import AdvisorPage from './features/advisor/AdvisorPage';
-import RiskPage from './features/risk/RiskPage';
+import PageState from './components/PageState';
+
+const MarketPage = lazy(() => import('./features/market/MarketPage'));
+const RiskPage = lazy(() => import('./features/risk/RiskPage'));
 
 const LazyPage = ({ title }: { title: string }) => (
   <div style={{ padding: 48, color: '#667085', textAlign: 'center' }}>
@@ -17,8 +21,22 @@ export default function App() {
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={<OverviewPage />} />
-          <Route path="market" element={<LazyPage title="行情对比" />} />
-          <Route path="risk" element={<RiskPage />} />
+          <Route
+            path="market"
+            element={
+              <Suspense fallback={<PageState state="loading" />}>
+                <MarketPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="risk"
+            element={
+              <Suspense fallback={<PageState state="loading" />}>
+                <RiskPage />
+              </Suspense>
+            }
+          />
           <Route path="portfolio" element={<LazyPage title="配置规划" />} />
           <Route path="advisor" element={<AdvisorPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

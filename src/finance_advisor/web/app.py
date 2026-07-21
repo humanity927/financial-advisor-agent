@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +12,12 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from finance_advisor.schemas import error_response, success_response
-from finance_advisor.web.common import FIXTURE_PATH, PROJECT_ROOT
+from finance_advisor.web.common import (
+    PROJECT_ROOT,
+    get_cache_dir,
+    get_fixture_path,
+    get_market_service,
+)
 from finance_advisor.web.routes import advisor, market, portfolio, risk
 
 
@@ -111,14 +117,23 @@ def create_app(static_dir: Path | None = None) -> FastAPI:
 
     @app.get("/api/health")
     def health() -> dict[str, Any]:
+        cache_dir = get_cache_dir()
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        fixture_path = get_fixture_path()
+        service = get_market_service()
         return success_response(
             {
                 "status": "healthy",
                 "service": "finance-advisor-web",
+                "akshare_installed": service.live.available(),
+                "cache_directory": str(cache_dir),
+                "cache_writable": os.access(cache_dir, os.W_OK),
+                "fixture_path": str(fixture_path),
+                "fixture_available": service.fixture.available(),
+                "force_fixture": service.force_fixture,
+                "supported_symbol_count": 4,
                 "frontend_dist": str(resolved_static_dir),
                 "frontend_available": (resolved_static_dir / "index.html").is_file(),
-                "fixture_path": str(FIXTURE_PATH),
-                "fixture_available": FIXTURE_PATH.is_file(),
             },
             source="system",
         )

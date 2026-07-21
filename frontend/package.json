@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test",
+    "e2e": "node e2e/run-e2e.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
