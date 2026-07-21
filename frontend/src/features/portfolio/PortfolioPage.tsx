@@ -8,15 +8,17 @@ import {
   Empty,
   Form,
   InputNumber,
-  Progress,
   Row,
   Space,
+  Switch,
   Table,
   Tag,
   Typography,
 } from 'antd';
 import type { TableColumnsType } from 'antd';
-import { ReloadOutlined } from '@ant-design/icons';
+import ReactECharts from 'echarts-for-react';
+import type { EChartsOption } from 'echarts';
+import { BarChart3, PieChart, RefreshCcw } from 'lucide-react';
 import SectionHeader from '../../components/SectionHeader';
 import ProfileForm from '../../components/ProfileForm';
 import PageState from '../../components/PageState';
@@ -26,10 +28,10 @@ import type { PortfolioPlanResult, ProfileInput } from '../../api/types';
 import './PortfolioPage.css';
 
 const ASSETS = [
-  { key: '现金', label: '现金', color: '#1677ff' },
+  { key: '现金', label: '现金', color: '#2B7BD6' },
   { key: '债券', label: '债券', color: '#52c41a' },
-  { key: '股票', label: '股票', color: '#fa541c' },
-  { key: '黄金', label: '黄金', color: '#d48806' },
+  { key: '股票', label: '股票', color: '#CF1322' },
+  { key: '黄金', label: '黄金', color: '#D4883A' },
 ] as const;
 
 const DEFAULT_CURRENT_ALLOCATION: Record<string, number> = {
@@ -47,7 +49,14 @@ interface AllocationRow {
   suggestedPct: number;
   currentPct: number | null;
   deviationPct: number | null;
-  amount: number;
+  suggestedAmount: number;
+  currentAmount: number | null;
+  deviationAmount: number | null;
+}
+
+interface PortfolioMutationInput {
+  profile: ProfileInput;
+  currentAllocationPct: Record<string, number> | null;
 }
 
 function labelFor(assetKey: string) {
@@ -58,6 +67,14 @@ function formatCny(value: number) {
   return `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function formatSignedCny(value: number) {
+  const sign = value > 0 ? '+' : value < 0 ? '-' : '';
+  return `${sign}¥${Math.abs(value).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 function deviationTag(value: number | null) {
   if (value === null) {
     return <Tag>未填写</Tag>;
@@ -66,7 +83,7 @@ function deviationTag(value: number | null) {
     return <Tag color="default">持平</Tag>;
   }
   return (
-    <Tag color={value > 0 ? 'red' : 'green'}>
+    <Tag color={value > 0 ? 'geekblue' : 'gold'}>
       {value > 0 ? '+' : ''}
       {value.toFixed(1)}%
     </Tag>
@@ -74,6 +91,7 @@ function deviationTag(value: number | null) {
 }
 
 export default function PortfolioPage() {
+  const [compareCurrent, setCompareCurrent] = useState(true);
   const [currentAllocation, setCurrentAllocation] = useState<Record<string, number>>(
     DEFAULT_CURRENT_ALLOCATION,
   );
@@ -85,18 +103,24 @@ export default function PortfolioPage() {
   const currentTotalValid = Math.abs(currentTotal - 100) < 0.01;
 
   const mutation = useMutation({
-    mutationFn: (profile: ProfileInput) =>
+    mutationFn: ({ profile, currentAllocationPct }: PortfolioMutationInput) =>
       client.post<PortfolioPlanResult>('/portfolio/plan', {
         ...profile,
-        current_allocation_pct: currentAllocation,
+        current_allocation_pct: currentAllocationPct,
       }),
   });
 
   const handleSubmit = useCallback(
     (values: ProfileInput) => {
-      mutation.mutate(values);
+      if (compareCurrent && !currentTotalValid) {
+        return;
+      }
+      mutation.mutate({
+        profile: values,
+        currentAllocationPct: compareCurrent ? { ...currentAllocation } : null,
+      });
     },
-    [mutation],
+    [compareCurrent, currentAllocation, currentTotalValid, mutation],
   );
 
   const plan = mutation.data?.data;
@@ -110,8 +134,72 @@ export default function PortfolioPage() {
       suggestedPct: pct,
       currentPct: plan.current_allocation_pct?.[assetKey] ?? null,
       deviationPct: plan.allocation_deviation_pct?.[assetKey] ?? null,
-      amount: plan.allocation_amount_cny[assetKey] ?? 0,
+      suggestedAmount: plan.allocation_amount_cny[assetKey] ?? 0,
+      currentAmount: plan.current_allocation_amount_cny?.[assetKey] ?? null,
+      deviationAmount: plan.allocation_deviation_amount_cny?.[assetKey] ?? null,
     }));
+  }, [plan]);
+
+  const pieOption = useMemo<EChartsOption | null>(() => {
+    if (!plan) {
+      return null;
+    }
+    return {
+      color: ASSETS.map((asset) => asset.color),
+      tooltip: { trigger: 'item', formatter: '{b}: {c}%' },
+      legend: { bottom: 0, itemWidth: 12, itemHeight: 8 },
+      series: [
+        {
+          type: 'pie',
+          radius: ['48%', '72%'],
+          center: ['50%', '43%'],
+          avoidLabelOverlap: true,
+          label: {
+            position: 'inside',
+            formatter: '{c}%',
+            color: '#FFFFFF',
+            fontWeight: 600,
+          },
+          labelLine: { show: false },
+          data: ASSETS.map((asset) => ({
+            name: asset.label,
+            value: plan.allocation_pct[asset.key] ?? 0,
+          })),
+        },
+      ],
+    };
+  }, [plan]);
+
+  const comparisonOption = useMemo<EChartsOption | null>(() => {
+    if (!plan) {
+      return null;
+    }
+    const series: EChartsOption['series'] = [
+      {
+        name: '建议比例',
+        type: 'bar',
+        data: ASSETS.map((asset) => plan.allocation_pct[asset.key] ?? 0),
+        itemStyle: { color: '#2B7BD6' },
+        barMaxWidth: 22,
+      },
+    ];
+    if (plan.current_allocation_pct) {
+      series.unshift({
+        name: '当前比例',
+        type: 'bar',
+        data: ASSETS.map((asset) => plan.current_allocation_pct?.[asset.key] ?? 0),
+        itemStyle: { color: '#98A2B3' },
+        barMaxWidth: 22,
+      });
+    }
+    return {
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: (value) => `${value}%` },
+      legend: { top: 0 },
+      grid: { left: 56, right: 20, top: 42, bottom: 30 },
+      xAxis: { type: 'value', min: 0, max: 100, axisLabel: { formatter: '{value}%' } },
+      yAxis: { type: 'category', data: ASSETS.map((asset) => asset.label) },
+      series,
+    };
   }, [plan]);
 
   const columns: TableColumnsType<AllocationRow> = [
@@ -126,7 +214,7 @@ export default function PortfolioPage() {
     },
     {
       title: '建议金额',
-      dataIndex: 'amount',
+      dataIndex: 'suggestedAmount',
       key: 'amount',
       className: 'text-right',
       width: 140,
@@ -141,11 +229,27 @@ export default function PortfolioPage() {
       render: (value: number | null) => (value === null ? '-' : `${value.toFixed(1)}%`),
     },
     {
+      title: '当前金额',
+      dataIndex: 'currentAmount',
+      key: 'currentAmount',
+      className: 'text-right',
+      width: 140,
+      render: (value: number | null) => (value === null ? '-' : formatCny(value)),
+    },
+    {
       title: '目标偏离',
       dataIndex: 'deviationPct',
       key: 'deviationPct',
       width: 112,
       render: (value: number | null) => deviationTag(value),
+    },
+    {
+      title: '目标金额差额',
+      dataIndex: 'deviationAmount',
+      key: 'deviationAmount',
+      className: 'text-right',
+      width: 152,
+      render: (value: number | null) => (value === null ? '-' : formatSignedCny(value)),
     },
   ];
 
@@ -165,9 +269,28 @@ export default function PortfolioPage() {
 
       <div className="portfolio-grid">
         <div className="portfolio-stack">
-          <ProfileForm onSubmit={handleSubmit} loading={mutation.isPending} />
+          <ProfileForm
+            onSubmit={handleSubmit}
+            loading={mutation.isPending}
+            submitLabel="生成配置方案"
+            submitTestId="portfolio-submit"
+            submitDisabled={compareCurrent && !currentTotalValid}
+          />
 
-          <Card className="portfolio-form-card" title="当前配置">
+          <Card
+            className="portfolio-form-card"
+            title="当前配置"
+            extra={
+              <Space size="small">
+                <Typography.Text type="secondary">偏离对比</Typography.Text>
+                <Switch
+                  aria-label="参与当前配置对比"
+                  checked={compareCurrent}
+                  onChange={setCompareCurrent}
+                />
+              </Space>
+            }
+          >
             <Form layout="vertical">
               {ASSETS.map((asset) => (
                 <Form.Item label={`${asset.label}比例（%）`} key={asset.key}>
@@ -176,6 +299,8 @@ export default function PortfolioPage() {
                     max={100}
                     precision={1}
                     value={currentAllocation[asset.key]}
+                    disabled={!compareCurrent}
+                    aria-label={`${asset.label}比例`}
                     onChange={(value) =>
                       setCurrentAllocation((prev) => ({
                         ...prev,
@@ -188,10 +313,13 @@ export default function PortfolioPage() {
               ))}
             </Form>
             <Alert
-              type={currentTotalValid ? 'success' : 'warning'}
+              type={!compareCurrent ? 'info' : currentTotalValid ? 'success' : 'warning'}
               showIcon
-              message={`当前比例合计：${currentTotal.toFixed(1)}%`}
-              description="合计为 100% 时，系统会同时计算当前配置与目标配置的偏离。"
+              message={
+                compareCurrent
+                  ? `当前比例合计：${currentTotal.toFixed(1)}%`
+                  : '未纳入当前配置对比'
+              }
             />
           </Card>
         </div>
@@ -220,8 +348,8 @@ export default function PortfolioPage() {
                   mutation.variables ? (
                     <Button
                       size="small"
-                      icon={<ReloadOutlined />}
-                      onClick={() => mutation.mutate(mutation.variables as ProfileInput)}
+                      icon={<RefreshCcw size={14} />}
+                      onClick={() => mutation.mutate(mutation.variables)}
                     >
                       重试
                     </Button>
@@ -245,6 +373,9 @@ export default function PortfolioPage() {
                     source={mutation.data.meta.source}
                     isFallback={mutation.data.meta.is_fallback}
                   />
+                  <Typography.Text type="secondary">
+                    计算时间：{mutation.data.meta.as_of}
+                  </Typography.Text>
                 </div>
 
                 <div className="portfolio-risk-summary">
@@ -262,18 +393,17 @@ export default function PortfolioPage() {
                   </div>
                 </div>
 
-                <div className="portfolio-bars">
-                  {rows.map((row) => (
-                    <div className="portfolio-bar-row" key={row.key}>
-                      <span className="portfolio-bar-name">{row.label}</span>
-                      <Progress
-                        percent={row.suggestedPct}
-                        strokeColor={ASSETS.find((asset) => asset.key === row.key)?.color}
-                        showInfo={false}
-                      />
-                      <span className="portfolio-bar-value">{row.suggestedPct.toFixed(1)}%</span>
-                    </div>
-                  ))}
+                <div className="portfolio-visual-grid">
+                  <section className="portfolio-chart-panel" data-testid="portfolio-allocation-chart">
+                    <h3><PieChart size={17} />建议配置结构</h3>
+                    {pieOption && <ReactECharts option={pieOption} className="portfolio-chart" />}
+                  </section>
+                  <section className="portfolio-chart-panel" data-testid="portfolio-comparison-chart">
+                    <h3><BarChart3 size={17} />当前与建议对比</h3>
+                    {comparisonOption && (
+                      <ReactECharts option={comparisonOption} className="portfolio-chart" />
+                    )}
+                  </section>
                 </div>
               </Card>
 
@@ -284,7 +414,7 @@ export default function PortfolioPage() {
                   rowKey="key"
                   pagination={false}
                   size="small"
-                  scroll={{ x: 680 }}
+                  scroll={{ x: 1040 }}
                   summary={() => (
                     <Table.Summary.Row>
                       <Table.Summary.Cell index={0}>合计</Table.Summary.Cell>
@@ -295,7 +425,13 @@ export default function PortfolioPage() {
                       <Table.Summary.Cell index={3} className="text-right">
                         {plan.current_allocation_pct ? '100.0%' : '-'}
                       </Table.Summary.Cell>
-                      <Table.Summary.Cell index={4}>偏离合计 0</Table.Summary.Cell>
+                      <Table.Summary.Cell index={4} className="text-right">
+                        {plan.current_allocation_amount_cny
+                          ? formatCny(plan.total_amount_cny)
+                          : '-'}
+                      </Table.Summary.Cell>
+                      <Table.Summary.Cell index={5}>比例差额 0</Table.Summary.Cell>
+                      <Table.Summary.Cell index={6}>金额差额 0</Table.Summary.Cell>
                     </Table.Summary.Row>
                   )}
                 />
@@ -332,6 +468,19 @@ export default function PortfolioPage() {
                     ))}
                   </Space>
                 </Card>
+              )}
+
+              {mutation.data.warnings.length > 0 && (
+                <Alert
+                  type="info"
+                  showIcon
+                  message="方案说明"
+                  description={
+                    <ul className="portfolio-list">
+                      {mutation.data.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+                    </ul>
+                  }
+                />
               )}
 
               <Alert

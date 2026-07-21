@@ -44,7 +44,9 @@ def test_portfolio_plan_returns_web_contract(client: TestClient) -> None:
     assert data["total_amount_cny"] == 50_000
     assert round(sum(data["allocation_pct"].values()), 1) == 100.0
     assert data["current_allocation_pct"] is None
+    assert data["current_allocation_amount_cny"] is None
     assert data["allocation_deviation_pct"] is None
+    assert data["allocation_deviation_amount_cny"] is None
     assert data["adjustment_steps"]
     assert data["rationale"]
 
@@ -58,7 +60,9 @@ def test_portfolio_plan_compares_current_allocation(client: TestClient) -> None:
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["current_allocation_pct"] == request["current_allocation_pct"]
+    assert round(sum(data["current_allocation_amount_cny"].values()), 2) == 50_000.0
     assert round(sum(data["allocation_deviation_pct"].values()), 1) == 0.0
+    assert round(sum(data["allocation_deviation_amount_cny"].values()), 2) == 0.0
 
 
 def test_portfolio_plan_rejects_invalid_current_allocation(client: TestClient) -> None:
@@ -71,3 +75,17 @@ def test_portfolio_plan_rejects_invalid_current_allocation(client: TestClient) -
     payload = response.json()
     assert payload["ok"] is False
     assert payload["error"]["code"] == "invalid_portfolio_plan_request"
+
+
+def test_portfolio_plan_rejects_boolean_current_allocation(client: TestClient) -> None:
+    request = _profile_payload()
+    request["current_allocation_pct"] = {
+        "现金": True,
+        "债券": 64.0,
+        "股票": 25.0,
+        "黄金": 10.0,
+    }
+
+    response = client.post("/api/portfolio/plan", json=request)
+
+    assert response.status_code == 422

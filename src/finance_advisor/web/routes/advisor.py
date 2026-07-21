@@ -11,8 +11,9 @@ from fastapi.responses import JSONResponse
 from pydantic import Field
 
 from finance_advisor.agent.hermes_cli_adapter import HermesCliAdapter, HermesCliError
-from finance_advisor.allocation.service import build_portfolio_plan
+from finance_advisor.allocation.service import AllocationPercentage, build_portfolio_plan
 from finance_advisor.market.symbols import SymbolValidationError, normalize_symbols
+from finance_advisor.risk.service import build_asset_risk_report
 from finance_advisor.schemas import InvestorProfileInput, error_response, success_response
 from finance_advisor.web.common import (
     PROJECT_ROOT,
@@ -23,11 +24,25 @@ from finance_advisor.web.common import (
 )
 
 LOGGER = logging.getLogger(__name__)
+REQUIRED_REPORT_SECTIONS = (
+    "用户画像",
+    "行情摘要",
+    "风险指标",
+    "配置建议",
+    "建议原因",
+    "数据时间与来源",
+    "风险提示",
+)
+REQUIRED_RISK_TERMS = ("年化波动率", "最大回撤", "VaR", "CVaR")
 
 
 class AdvisorReportRequest(InvestorProfileInput):
-    symbols: list[str] = Field(default_factory=lambda: ["510300", "511010", "518880", "511880"])
-    current_allocation_pct: dict[str, float] | None = None
+    symbols: list[str] = Field(
+        default_factory=lambda: ["510300", "511010", "518880", "511880"],
+        min_length=1,
+        max_length=4,
+    )
+    current_allocation_pct: dict[str, AllocationPercentage] | None = None
 
 
 router = APIRouter()
@@ -58,28 +73,79 @@ def _build_report_prompt(
     profile: AdvisorReportRequest,
     portfolio_plan: dict[str, object],
     snapshots: list[dict[str, object]],
+    asset_risk: dict[str, Any],
     source: str,
     as_of: str,
     warnings: list[str],
 ) -> str:
-    facts: dict[str, Any] = {
-        "investor_profile": profile.model_dump(
-            mode="json",
-            exclude={"symbols", "current_allocation_pct"},
-        ),
-        "market_snapshots": snapshots,
-        "portfolio_plan": portfolio_plan,
-        "source": source,
-        "as_of": as_of,
-        "warnings": warnings,
+    request_data = profile.model_dump(mode="json")
+    deterministic_comparison: dict[str, Any] = {
+        key: portfolio_plan[key]
+        for key in (
+            "current_allocation_pct",
+            "current_allocation_amount_cny",
+            "allocation_deviation_pct",
+            "allocation_deviation_amount_cny",
+        )
+        if portfolio_plan.get(key) is not None
+    }
+    deterministic_portfolio: dict[str, Any] = {
+        key: portfolio_plan[key]
+        for key in (
+            "risk_score",
+            "scored_risk_level",
+            "effective_risk_level",
+            "constraints_applied",
+            "allocation_pct",
+            "allocation_amount_cny",
+            "rationale",
+        )
+    }
+    context: dict[str, Any] = {
+        "validated_request": request_data,
+        "deterministic_market_snapshots": snapshots,
+        "deterministic_asset_risk": asset_risk,
+        "deterministic_portfolio": deterministic_portfolio,
+        "deterministic_current_vs_target": deterministic_comparison or None,
+        "market_metadata_preflight": {
+            "source": source,
+            "as_of": as_of,
+            "warnings": warnings,
+        },
     }
     return (
-        "你是金融理财课程演示系统的报告撰写 Agent。"
-        "只能基于下方 JSON 中的确定性事实生成报告，不得编造行情、比例或收益。"
-        "报告必须包含：用户画像、行情摘要、风险与约束、资产配置建议、建议原因、"
-        "数据时间与来源、风险提示。禁止承诺收益，禁止给出买入、卖出、加仓等真实交易指令。\n\n"
-        f"确定性事实 JSON：\n{json.dumps(facts, ensure_ascii=False, indent=2)}"
+        "你是金融理财课程演示系统的报告撰写 Agent。必须实际调用 finance MCP 工具，"
+        "不得仅凭提示词自行计算或编造金融数值。为控制响应时间，请在同一轮并行调用以下"
+        "四个只读工具：\n"
+        "- assess_investor_profile：评估完整七项画像；\n"
+        "- get_market_snapshot：查询 validated_request.symbols；\n"
+        "- analyze_asset_risk：分析相同标的，lookback_days=252；\n"
+        "- build_allocation：生成确定性配置比例和金额。\n"
+        "工具结果返回后再统一撰写报告。如任一工具失败，明确说明失败和缺失内容，不得补造数字。\n"
+        "deterministic_* 字段由相同的确定性金融服务预先计算，仅用于核验工具结果和防止遗漏，"
+        "可以引用但不得改写或重新计算。报告必须使用以下完全一致的 Markdown 二级标题并按"
+        "顺序输出：用户画像、行情摘要、风险指标、配置建议、建议原因、数据时间与来源、风险提示。"
+        "风险指标必须逐项写明可用标的的年化波动率、最大回撤、VaR 和 CVaR；配置建议必须写明"
+        "比例与金额。fixture 必须显著标注"
+        "“演示数据/非实时数据”。禁止承诺收益，禁止预测必涨必跌，禁止给出买入、卖出、"
+        "加仓等真实交易指令。风险提示必须包含“历史表现不代表未来收益”。\n\n"
+        f"已校验请求上下文 JSON：\n{json.dumps(context, ensure_ascii=False, indent=2)}"
     )
+
+
+def _validate_report_content(content: str, *, require_fixture_label: bool) -> None:
+    missing = [section for section in REQUIRED_REPORT_SECTIONS if section not in content]
+    missing.extend(term for term in REQUIRED_RISK_TERMS if term not in content)
+    if "历史表现不代表未来收益" not in content:
+        missing.append("历史表现不代表未来收益")
+    if require_fixture_label and not ("演示数据" in content and "非实时数据" in content):
+        missing.append("演示数据/非实时数据")
+    if missing:
+        raise HermesCliError(
+            "hermes_incomplete_report",
+            f"Hermes 报告缺少必要内容：{'、'.join(missing)}",
+            retryable=True,
+        )
 
 
 @router.post("/report", response_model=None)
@@ -100,6 +166,11 @@ def advisor_report(request: AdvisorReportRequest) -> dict[str, object] | JSONRes
         source = source_for(loaded)
         warnings = warnings_for(loaded)
         portfolio_plan = build_portfolio_plan(request, request.current_allocation_pct)
+        risk_report = build_asset_risk_report(
+            service,
+            [symbol.symbol for symbol in normalized],
+            252,
+        )
     except ValueError as exc:
         return JSONResponse(
             status_code=400,
@@ -120,13 +191,19 @@ def advisor_report(request: AdvisorReportRequest) -> dict[str, object] | JSONRes
         profile=request,
         portfolio_plan=portfolio_plan,
         snapshots=snapshots,
+        asset_risk=risk_report.data,
         source=source,
         as_of=as_of,
         warnings=warnings,
     )
     try:
         content = get_hermes_adapter().generate_report(prompt)
-    except FileNotFoundError:
+        _validate_report_content(
+            content,
+            require_fixture_label=any(item.source == "fixture" for item in loaded),
+        )
+    except OSError as exc:
+        LOGGER.warning("Hermes CLI could not start error_type=%s", type(exc).__name__)
         return JSONResponse(
             status_code=503,
             content=error_response(

@@ -1,12 +1,26 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import cast
+from math import isfinite
+from typing import Annotated, Any, cast
+
+from pydantic import BeforeValidator
 
 from finance_advisor.risk.profile import RISK_LEVELS, assess_profile
 from finance_advisor.schemas import InvestorProfileInput, LiquidityNeed
 
 ASSET_CLASSES = ("现金", "债券", "股票", "黄金")
+
+
+def _validate_percentage_input(value: Any) -> Any:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError("配置比例必须使用JSON数值，不能使用布尔值或字符串")
+    if not isfinite(float(value)):
+        raise ValueError("配置比例必须是有限数值")
+    return value
+
+
+AllocationPercentage = Annotated[float, BeforeValidator(_validate_percentage_input)]
 
 BASE_ALLOCATIONS: dict[str, dict[str, float]] = {
     "保守型": {"现金": 40.0, "债券": 45.0, "股票": 5.0, "黄金": 10.0},
@@ -49,6 +63,18 @@ def _rounded_percentages(allocation: dict[str, float]) -> dict[str, float]:
     return rounded
 
 
+def _amounts_from_percentages(
+    amount_cny: float,
+    percentages: Mapping[str, float],
+) -> dict[str, float]:
+    amounts = {
+        asset: round(amount_cny * float(percentages[asset]) / 100.0, 2) for asset in ASSET_CLASSES
+    }
+    residual = round(amount_cny - sum(amounts.values()), 2)
+    amounts["现金"] = round(amounts["现金"] + residual, 2)
+    return amounts
+
+
 def _validate_current_allocation_pct(
     current_allocation_pct: Mapping[str, float],
 ) -> dict[str, float]:
@@ -60,12 +86,13 @@ def _validate_current_allocation_pct(
     if missing_assets:
         raise ValueError(f"当前配置缺少资产类别：{', '.join(missing_assets)}")
 
-    current = {
-        asset: round(float(current_allocation_pct[asset]), 1)
-        for asset in ASSET_CLASSES
-    }
-    if any(value < 0 for value in current.values()):
-        raise ValueError("当前配置比例不能为负数")
+    current: dict[str, float] = {}
+    for asset in ASSET_CLASSES:
+        raw_value = _validate_percentage_input(current_allocation_pct[asset])
+        value = round(float(raw_value), 1)
+        if value < 0 or value > 100:
+            raise ValueError("当前配置比例必须在0到100之间")
+        current[asset] = value
 
     total = round(sum(current.values()), 1)
     if total != 100.0:
@@ -78,11 +105,22 @@ def _allocation_deviation_pct(
     current: Mapping[str, float],
 ) -> dict[str, float]:
     deviation = {
-        asset: round(float(suggested[asset]) - float(current[asset]), 1)
-        for asset in ASSET_CLASSES
+        asset: round(float(suggested[asset]) - float(current[asset]), 1) for asset in ASSET_CLASSES
     }
     residual = round(0.0 - sum(deviation.values()), 1)
     deviation["现金"] = round(deviation["现金"] + residual, 1)
+    return deviation
+
+
+def _allocation_deviation_amount_cny(
+    suggested: Mapping[str, float],
+    current: Mapping[str, float],
+) -> dict[str, float]:
+    deviation = {
+        asset: round(float(suggested[asset]) - float(current[asset]), 2) for asset in ASSET_CLASSES
+    }
+    residual = round(0.0 - sum(deviation.values()), 2)
+    deviation["现金"] = round(deviation["现金"] + residual, 2)
     return deviation
 
 
@@ -101,8 +139,9 @@ def _adjustment_steps(
     else:
         steps.append(f"未触发风险等级下调，沿用有效风险等级：{effective_risk_level}")
 
+    steps.append(f"载入{effective_risk_level}对应的四类资产基础配置模板")
     steps.extend(f"应用硬约束：{constraint}" for constraint in constraints)
-    steps.append("在不修改基础权重的前提下生成四类资产建议比例")
+    steps.append("在基础模板上按硬约束调整，并将最终比例归一化到100%")
     if has_current_allocation:
         steps.append("将建议比例与当前比例逐项比较，生成配置偏离")
     return steps
@@ -148,12 +187,7 @@ def build_portfolio_allocation(profile: InvestorProfileInput) -> dict[str, objec
     _apply_cash_floor(allocation, cash_floor)
 
     percentages = _rounded_percentages(allocation)
-    amounts = {
-        name: round(profile.amount_cny * percentage / 100.0, 2)
-        for name, percentage in percentages.items()
-    }
-    amount_residual = round(profile.amount_cny - sum(amounts.values()), 2)
-    amounts["现金"] = round(amounts["现金"] + amount_residual, 2)
+    amounts = _amounts_from_percentages(profile.amount_cny, percentages)
 
     return {
         "risk_score": assessment.score,
@@ -180,6 +214,12 @@ def build_portfolio_plan(
         if current_allocation_pct is not None
         else None
     )
+    current_amounts = (
+        _amounts_from_percentages(profile.amount_cny, current_pct)
+        if current_pct is not None
+        else None
+    )
+    suggested_amounts = cast(dict[str, float], allocation["allocation_amount_cny"])
 
     plan = dict(allocation)
     plan["adjustment_steps"] = _adjustment_steps(
@@ -194,9 +234,13 @@ def build_portfolio_plan(
         allocation_pct=suggested_pct,
     )
     plan["current_allocation_pct"] = current_pct
+    plan["current_allocation_amount_cny"] = current_amounts
     plan["allocation_deviation_pct"] = (
-        _allocation_deviation_pct(suggested_pct, current_pct)
-        if current_pct is not None
+        _allocation_deviation_pct(suggested_pct, current_pct) if current_pct is not None else None
+    )
+    plan["allocation_deviation_amount_cny"] = (
+        _allocation_deviation_amount_cny(suggested_amounts, current_amounts)
+        if current_amounts is not None
         else None
     )
     return plan

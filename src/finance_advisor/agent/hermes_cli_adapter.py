@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 from pathlib import Path
 
 MAX_PROMPT_CHARS = 8_000
+SENSITIVE_ENV_VARS = ("RELAY_API_KEY", "DEEPSEEK_API_KEY", "RELAY_BASE_URL")
+LOGGER = logging.getLogger(__name__)
 
 
 class HermesCliError(RuntimeError):
@@ -46,9 +49,9 @@ class HermesCliAdapter:
         env["HERMES_HOME"] = str(self.hermes_home)
         command = [
             self.executable,
-            "--oneshot",
             "--toolsets",
             "finance",
+            "--oneshot",
             prompt,
         ]
         process = subprocess.Popen(
@@ -70,12 +73,27 @@ class HermesCliAdapter:
             raise HermesCliError("hermes_timeout", "Hermes 生成报告超时", retryable=True) from exc
 
         if process.returncode != 0:
-            detail = stderr.strip() or "Hermes CLI 返回非零退出码"
-            raise HermesCliError("hermes_failed", detail, retryable=True)
+            LOGGER.warning(
+                "Hermes CLI failed returncode=%s stderr_present=%s",
+                process.returncode,
+                bool(stderr.strip()),
+            )
+            raise HermesCliError(
+                "hermes_failed",
+                "Hermes 顾问服务暂不可用，请检查模型与运行配置。",
+                retryable=True,
+            )
 
         report = stdout.strip()
         if not report:
             raise HermesCliError("hermes_empty_output", "Hermes 未返回可展示报告", retryable=True)
+        sensitive_values = [env.get(name, "") for name in SENSITIVE_ENV_VARS]
+        if any(len(value) >= 8 and value in report for value in sensitive_values):
+            raise HermesCliError(
+                "unsafe_output",
+                "Hermes 返回内容触发敏感信息保护，报告已拦截。",
+                retryable=True,
+            )
         return report
 
     def _terminate_process_tree(self, process: subprocess.Popen[str]) -> None:

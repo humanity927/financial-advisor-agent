@@ -8,6 +8,7 @@ interface ProfileFormProps {
   loading?: boolean;
   submitLabel?: string;
   submitTestId?: string;
+  submitDisabled?: boolean;
   symbols?: string[];
   onSymbolsChange?: (symbols: string[]) => void;
 }
@@ -43,6 +44,7 @@ export default function ProfileForm({
   loading = false,
   submitLabel = '生成报告',
   submitTestId,
+  submitDisabled = false,
   symbols,
   onSymbolsChange,
 }: ProfileFormProps) {
@@ -112,7 +114,14 @@ export default function ProfileForm({
           )}
 
           <Form.Item>
-            <Button type="primary" htmlType="submit" loading={loading} block data-testid={submitTestId}>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={loading}
+              disabled={submitDisabled}
+              block
+              data-testid={submitTestId}
+            >
               {submitLabel}
             </Button>
           </Form.Item>

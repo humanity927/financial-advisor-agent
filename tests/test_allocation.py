@@ -77,7 +77,20 @@ def test_portfolio_plan_calculates_deviation_without_changing_suggestion() -> No
         "股票": 40.0,
         "黄金": 0.0,
     }
+    assert result["current_allocation_amount_cny"] == {
+        "现金": 10_000.0,
+        "债券": 20_000.0,
+        "股票": 15_000.0,
+        "黄金": 5_000.0,
+    }
+    assert result["allocation_deviation_amount_cny"] == {
+        "现金": -7_500.0,
+        "债券": -12_500.0,
+        "股票": 20_000.0,
+        "黄金": 0.0,
+    }
     assert sum(result["allocation_deviation_pct"].values()) == 0.0  # type: ignore[union-attr]
+    assert sum(result["allocation_deviation_amount_cny"].values()) == 0.0  # type: ignore[union-attr]
     assert result["adjustment_steps"][-1] == "将建议比例与当前比例逐项比较，生成配置偏离"
     assert result["rationale"]
 
@@ -86,7 +99,9 @@ def test_portfolio_plan_allows_missing_current_allocation() -> None:
     result = build_portfolio_plan(_aggressive_profile(max_loss_pct=5))
 
     assert result["current_allocation_pct"] is None
+    assert result["current_allocation_amount_cny"] is None
     assert result["allocation_deviation_pct"] is None
+    assert result["allocation_deviation_amount_cny"] is None
     assert result["effective_risk_level"] == "保守型"
     assert "应用硬约束：最大可承受亏损不超过5%，风险等级上限为保守型" in result["adjustment_steps"]  # type: ignore[operator]
 
@@ -96,4 +111,20 @@ def test_portfolio_plan_rejects_invalid_current_allocation_total() -> None:
         build_portfolio_plan(
             _aggressive_profile(),
             {"现金": 20.0, "债券": 40.0, "股票": 20.0, "黄金": 10.0},
+        )
+
+
+@pytest.mark.parametrize("invalid_value", [True, "25", float("nan"), float("inf")])
+def test_portfolio_plan_rejects_non_numeric_or_non_finite_allocation(
+    invalid_value: object,
+) -> None:
+    with pytest.raises(ValueError, match="配置比例必须"):
+        build_portfolio_plan(
+            _aggressive_profile(),
+            {
+                "现金": invalid_value,  # type: ignore[dict-item]
+                "债券": 40.0,
+                "股票": 40.0,
+                "黄金": 20.0,
+            },
         )

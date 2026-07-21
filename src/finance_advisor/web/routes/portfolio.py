@@ -4,12 +4,12 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import Field
 
-from finance_advisor.allocation.service import build_portfolio_plan
+from finance_advisor.allocation.service import AllocationPercentage, build_portfolio_plan
 from finance_advisor.schemas import InvestorProfileInput, error_response, success_response
 
 
 class PortfolioPlanRequest(InvestorProfileInput):
-    current_allocation_pct: dict[str, float] | None = Field(
+    current_allocation_pct: dict[str, AllocationPercentage] | None = Field(
         default=None,
         description="Optional current allocation percentages keyed by asset class.",
     )

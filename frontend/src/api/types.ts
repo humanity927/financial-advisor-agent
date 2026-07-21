@@ -65,7 +65,9 @@ export interface PortfolioPlanResult extends AllocationResult {
   adjustment_steps: string[];
   rationale: string[];
   current_allocation_pct: Record<string, number> | null;
+  current_allocation_amount_cny: Record<string, number> | null;
   allocation_deviation_pct: Record<string, number> | null;
+  allocation_deviation_amount_cny: Record<string, number> | null;
 }
 
 /** 画像表单输入 */

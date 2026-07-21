@@ -69,7 +69,7 @@ def test_success_uses_fixed_cli_args_and_isolated_home(
     report = _adapter(tmp_path).generate_report("生成教学报告")
 
     assert report == "报告内容"
-    assert captured["args"] == ["hermes", "--oneshot", "--toolsets", "finance", "生成教学报告"]
+    assert captured["args"] == ["hermes", "--toolsets", "finance", "--oneshot", "生成教学报告"]
     assert captured["kwargs"]["shell"] is False
     assert captured["kwargs"]["cwd"] == str(tmp_path.resolve())
     env = captured["kwargs"]["env"]
@@ -102,14 +102,15 @@ def test_timeout_cleans_full_windows_process_tree(
 
 
 def test_nonzero_exit_returns_stable_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    process = FakeProcess(stderr="model unavailable", returncode=2)
+    process = FakeProcess(stderr="secret-key-and-provider-url", returncode=2)
     monkeypatch.setattr(subprocess, "Popen", lambda *_args, **_kwargs: process)
 
     with pytest.raises(HermesCliError) as exc_info:
         _adapter(tmp_path).generate_report("生成教学报告")
 
     assert exc_info.value.code == "hermes_failed"
-    assert exc_info.value.message == "model unavailable"
+    assert exc_info.value.message == "Hermes 顾问服务暂不可用，请检查模型与运行配置。"
+    assert "secret-key" not in exc_info.value.message
     assert exc_info.value.retryable is True
 
 
@@ -122,6 +123,22 @@ def test_empty_output_is_retryable_error(monkeypatch: pytest.MonkeyPatch, tmp_pa
 
     assert exc_info.value.code == "hermes_empty_output"
     assert exc_info.value.retryable is True
+
+
+def test_sensitive_environment_value_in_output_is_blocked(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    secret = "relay-secret-value"
+    process = FakeProcess(stdout=f"不应展示 {secret}", returncode=0)
+    monkeypatch.setenv("RELAY_API_KEY", secret)
+    monkeypatch.setattr(subprocess, "Popen", lambda *_args, **_kwargs: process)
+
+    with pytest.raises(HermesCliError) as exc_info:
+        _adapter(tmp_path).generate_report("生成教学报告")
+
+    assert exc_info.value.code == "unsafe_output"
+    assert secret not in exc_info.value.message
 
 
 def test_prompt_length_is_checked_before_process_start(
