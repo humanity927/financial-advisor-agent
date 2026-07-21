@@ -1,0 +1,196 @@
+{
+  "ok": true,
+  "data": {
+    "symbols": [
+      { "symbol": "510300", "name": "沪深300ETF", "asset_class": "股票" },
+      { "symbol": "511010", "name": "国债ETF", "asset_class": "债券" },
+      { "symbol": "518880", "name": "黄金ETF", "asset_class": "黄金" },
+      { "symbol": "511880", "name": "货币ETF", "asset_class": "现金" }
+    ],
+    "range_days": 252,
+    "common_start_date": "2025-07-30",
+    "latest_trade_date": "2026-07-17",
+    "observation_count": 253,
+    "normalized_series": [
+      {
+        "symbol": "510300",
+        "name": "沪深300ETF",
+        "asset_class": "股票",
+        "points": [
+          { "date": "2025-07-30", "close": 4.0641, "normalized": 100.0 },
+          { "date": "2025-09-30", "close": 3.8874, "normalized": 95.6522 },
+          { "date": "2025-12-31", "close": 3.9874, "normalized": 98.1127 },
+          { "date": "2026-03-31", "close": 4.0422, "normalized": 99.4611 },
+          { "date": "2026-05-29", "close": 4.1815, "normalized": 102.8887 },
+          { "date": "2026-07-17", "close": 4.183, "normalized": 102.9256 }
+        ]
+      },
+      {
+        "symbol": "511010",
+        "name": "国债ETF",
+        "asset_class": "债券",
+        "points": [
+          { "date": "2025-07-30", "close": 102.135, "normalized": 100.0 },
+          { "date": "2025-09-30", "close": 102.294, "normalized": 100.1557 },
+          { "date": "2025-12-31", "close": 102.0486, "normalized": 99.9154 },
+          { "date": "2026-03-31", "close": 102.6312, "normalized": 100.4858 },
+          { "date": "2026-05-29", "close": 102.8753, "normalized": 100.7248 },
+          { "date": "2026-07-17", "close": 103.3066, "normalized": 101.1471 }
+        ]
+      },
+      {
+        "symbol": "518880",
+        "name": "黄金ETF",
+        "asset_class": "黄金",
+        "points": [
+          { "date": "2025-07-30", "close": 5.3706, "normalized": 100.0 },
+          { "date": "2025-09-30", "close": 5.2042, "normalized": 96.9011 },
+          { "date": "2025-12-31", "close": 5.3227, "normalized": 99.1081 },
+          { "date": "2026-03-31", "close": 5.4078, "normalized": 100.6927 },
+          { "date": "2026-05-29", "close": 5.566, "normalized": 103.6384 },
+          { "date": "2026-07-17", "close": 5.5169, "normalized": 102.7413 }
+        ]
+      },
+      {
+        "symbol": "511880",
+        "name": "货币ETF",
+        "asset_class": "现金",
+        "points": [
+          { "date": "2025-07-30", "close": 100.1045, "normalized": 100.0 },
+          { "date": "2025-09-30", "close": 100.351, "normalized": 100.2462 },
+          { "date": "2025-12-31", "close": 100.7499, "normalized": 100.6447 },
+          { "date": "2026-03-31", "close": 101.097, "normalized": 100.9915 },
+          { "date": "2026-05-29", "close": 101.4028, "normalized": 101.2969 },
+          { "date": "2026-07-17", "close": 101.5765, "normalized": 101.4705 }
+        ]
+      }
+    ],
+    "interval_returns": [
+      {
+        "symbol": "510300",
+        "name": "沪深300ETF",
+        "asset_class": "股票",
+        "returns": { "20d": 3.4525, "60d": 1.8331, "252d": 2.9256 }
+      },
+      {
+        "symbol": "511010",
+        "name": "国债ETF",
+        "asset_class": "债券",
+        "returns": { "20d": 0.2111, "60d": -0.0883, "252d": 1.1471 }
+      },
+      {
+        "symbol": "518880",
+        "name": "黄金ETF",
+        "asset_class": "黄金",
+        "returns": { "20d": 1.1626, "60d": 0.9146, "252d": 2.7413 }
+      },
+      {
+        "symbol": "511880",
+        "name": "货币ETF",
+        "asset_class": "现金",
+        "returns": { "20d": 0.1024, "60d": 0.345, "252d": 1.4705 }
+      }
+    ],
+    "snapshots": [
+      {
+        "symbol": "510300",
+        "name": "沪深300ETF",
+        "asset_class": "股票",
+        "latest_price": 4.183,
+        "previous_close": 4.164,
+        "daily_change_pct": 0.4563,
+        "trade_date": "2026-07-17",
+        "source": "fixture",
+        "origin_source": null,
+        "is_fallback": true,
+        "warning": "演示数据/非实时数据，固定数据日期为 2026-07-17"
+      },
+      {
+        "symbol": "511010",
+        "name": "国债ETF",
+        "asset_class": "债券",
+        "latest_price": 103.3066,
+        "previous_close": 103.3377,
+        "daily_change_pct": -0.0301,
+        "trade_date": "2026-07-17",
+        "source": "fixture",
+        "origin_source": null,
+        "is_fallback": true,
+        "warning": "演示数据/非实时数据，固定数据日期为 2026-07-17"
+      },
+      {
+        "symbol": "518880",
+        "name": "黄金ETF",
+        "asset_class": "黄金",
+        "latest_price": 5.5169,
+        "previous_close": 5.551,
+        "daily_change_pct": -0.6143,
+        "trade_date": "2026-07-17",
+        "source": "fixture",
+        "origin_source": null,
+        "is_fallback": true,
+        "warning": "演示数据/非实时数据，固定数据日期为 2026-07-17"
+      },
+      {
+        "symbol": "511880",
+        "name": "货币ETF",
+        "asset_class": "现金",
+        "latest_price": 101.5765,
+        "previous_close": 101.5749,
+        "daily_change_pct": 0.0016,
+        "trade_date": "2026-07-17",
+        "source": "fixture",
+        "origin_source": null,
+        "is_fallback": true,
+        "warning": "演示数据/非实时数据，固定数据日期为 2026-07-17"
+      }
+    ],
+    "source_details": [
+      {
+        "symbol": "510300",
+        "name": "沪深300ETF",
+        "source": "fixture",
+        "origin_source": null,
+        "fetched_at": "2026-07-21T10:00:00+08:00",
+        "is_fallback": true,
+        "warning": "演示数据/非实时数据，固定数据日期为 2026-07-17"
+      },
+      {
+        "symbol": "511010",
+        "name": "国债ETF",
+        "source": "fixture",
+        "origin_source": null,
+        "fetched_at": "2026-07-21T10:00:00+08:00",
+        "is_fallback": true,
+        "warning": "演示数据/非实时数据，固定数据日期为 2026-07-17"
+      },
+      {
+        "symbol": "518880",
+        "name": "黄金ETF",
+        "source": "fixture",
+        "origin_source": null,
+        "fetched_at": "2026-07-21T10:00:00+08:00",
+        "is_fallback": true,
+        "warning": "演示数据/非实时数据，固定数据日期为 2026-07-17"
+      },
+      {
+        "symbol": "511880",
+        "name": "货币ETF",
+        "source": "fixture",
+        "origin_source": null,
+        "fetched_at": "2026-07-21T10:00:00+08:00",
+        "is_fallback": true,
+        "warning": "演示数据/非实时数据，固定数据日期为 2026-07-17"
+      }
+    ],
+    "method": "共同交易日对齐，不前向填充缺口；历史表现不代表未来收益",
+    "warnings": []
+  },
+  "meta": {
+    "source": "fixture",
+    "as_of": "2026-07-17",
+    "request_id": "e2e-market-compare",
+    "is_fallback": true
+  },
+  "warnings": ["演示数据/非实时数据，固定数据日期为 2026-07-17"]
+}
