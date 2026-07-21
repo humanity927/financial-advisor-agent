@@ -1,0 +1,48 @@
+{
+  "ok": true,
+  "data": {
+    "risk_level": "稳健型",
+    "score": 46,
+    "score_breakdown": {
+      "投资期限": 8,
+      "最大可承受亏损": 10,
+      "投资经验": 7,
+      "收入稳定性": 8,
+      "流动性需求": 8,
+      "应急资金": 5
+    },
+    "score_max": {
+      "投资期限": 20,
+      "最大可承受亏损": 30,
+      "投资经验": 15,
+      "收入稳定性": 15,
+      "流动性需求": 15,
+      "应急资金": 5
+    },
+    "correlation_matrix": {
+      "labels": ["沪深300ETF", "国债ETF", "黄金ETF", "货币ETF"],
+      "matrix": [
+        [1.0, -0.23, 0.15, -0.08],
+        [-0.23, 1.0, -0.12, 0.31],
+        [0.15, -0.12, 1.0, -0.05],
+        [-0.08, 0.31, -0.05, 1.0]
+      ]
+    },
+    "portfolio_metrics": {
+      "observation_count": 252,
+      "annual_return_pct": 2.34,
+      "annual_volatility_pct": 3.87,
+      "max_drawdown_pct": -2.15,
+      "daily_var_95_pct": 0.42,
+      "daily_cvar_95_pct": 0.68
+    },
+    "method": "历史数据统计，不代表未来表现"
+  },
+  "meta": {
+    "source": "fixture",
+    "as_of": "2026-07-17",
+    "request_id": "mock-004",
+    "is_fallback": true
+  },
+  "warnings": ["演示数据/非实时数据"]
+}
