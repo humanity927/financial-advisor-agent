@@ -1,0 +1,23 @@
+{
+  "ok": true,
+  "data": {
+    "score": 46,
+    "risk_level": "稳健型",
+    "score_breakdown": {
+      "投资期限": 8,
+      "最大可承受亏损": 10,
+      "投资经验": 7,
+      "收入稳定性": 8,
+      "流动性需求": 8,
+      "应急资金": 5
+    },
+    "hard_limits": []
+  },
+  "meta": {
+    "source": "system",
+    "as_of": "2026-07-20T19:00:00+08:00",
+    "request_id": "mock-005",
+    "is_fallback": false
+  },
+  "warnings": []
+}
