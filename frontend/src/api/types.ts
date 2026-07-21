@@ -61,6 +61,13 @@ export interface AllocationResult {
   method: string;
 }
 
+export interface PortfolioPlanResult extends AllocationResult {
+  adjustment_steps: string[];
+  rationale: string[];
+  current_allocation_pct: Record<string, number> | null;
+  allocation_deviation_pct: Record<string, number> | null;
+}
+
 /** 画像表单输入 */
 export interface ProfileInput {
   amount_cny: number;
