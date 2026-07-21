@@ -30,7 +30,7 @@ export interface AssetRiskResult {
   name: string;
   asset_class: string;
   metrics: AssetRiskMetrics | null;
-  source: string;
+  source: string | null;
   warning: string | null;
   error?: string;
 }
@@ -52,8 +52,8 @@ export interface CorrelationMatrix {
 
 export interface PortfolioMetrics {
   observation_count: number;
-  start_date?: string;
-  end_date?: string;
+  start_date: string;
+  end_date: string;
   annual_return_pct: number;
   annual_volatility_pct: number;
   max_drawdown_pct: number;

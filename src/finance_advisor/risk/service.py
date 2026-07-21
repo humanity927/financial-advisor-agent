@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Any
+from typing import Annotated, Any
+
+from pydantic import BeforeValidator
 
 from finance_advisor.market.models import MarketSeries
 from finance_advisor.market.service import MarketService
@@ -22,6 +24,15 @@ MAX_LOOKBACK_DAYS = 1260
 MAX_RISK_SYMBOLS = 4
 ASSET_RISK_METHOD = "历史数据统计，不代表未来表现"
 PORTFOLIO_RISK_METHOD = "固定权重每日再平衡的历史组合统计，不代表未来表现"
+
+
+def _validate_weight_input(value: Any) -> Any:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError("组合权重必须使用JSON数值，不能使用布尔值或字符串")
+    return value
+
+
+PortfolioWeight = Annotated[float, BeforeValidator(_validate_weight_input)]
 
 
 class InvalidLookbackError(ValueError):

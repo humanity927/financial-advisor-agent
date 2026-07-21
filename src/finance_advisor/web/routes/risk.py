@@ -12,6 +12,7 @@ from finance_advisor.market.symbols import SymbolValidationError
 from finance_advisor.risk.portfolio import PortfolioValidationError
 from finance_advisor.risk.service import (
     InvalidLookbackError,
+    PortfolioWeight,
     RiskDataUnavailableError,
     build_asset_risk_report,
     build_portfolio_risk_report,
@@ -34,7 +35,7 @@ class AssetRiskRequest(BaseModel):
 class PortfolioRiskRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    weights_pct: dict[str, float] = Field(min_length=1, max_length=4)
+    weights_pct: dict[str, PortfolioWeight] = Field(min_length=1, max_length=4)
     lookback_days: int = Field(default=252, ge=60, le=1260)
 
 

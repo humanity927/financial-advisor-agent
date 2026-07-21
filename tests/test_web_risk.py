@@ -88,6 +88,25 @@ def test_portfolio_risk_rejects_weights_that_do_not_sum_to_100(client: TestClien
     assert payload["error"]["code"] == "invalid_weights"
 
 
+@pytest.mark.parametrize("invalid_weight", [True, "40"])
+def test_portfolio_risk_rejects_non_numeric_json_weights(
+    client: TestClient,
+    invalid_weight: object,
+) -> None:
+    response = client.post(
+        "/api/risk/portfolio",
+        json={
+            "weights_pct": {"510300": invalid_weight, "511010": 60},
+            "lookback_days": 252,
+        },
+    )
+
+    assert response.status_code == 422
+    payload = response.json()
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == "validation_error"
+
+
 def test_risk_validation_errors_keep_unified_envelope(client: TestClient) -> None:
     response = client.post("/api/risk/assets", json={"symbols": [], "lookback_days": 20})
 

@@ -85,9 +85,11 @@ def test_invalid_symbol_and_lookback_are_structured_errors() -> None:
 def test_invalid_portfolio_weights_are_structured_errors() -> None:
     bad_total = server.analyze_portfolio_risk({"510300": 80.0}, 80)
     duplicate_alias = server.analyze_portfolio_risk({"510300": 50.0, "沪深300": 50.0}, 80)
+    boolean_weight = server.analyze_portfolio_risk({"510300": True, "511010": 99.0}, 80)
 
     assert bad_total["error"]["code"] == "invalid_weights"
     assert duplicate_alias["error"]["code"] == "invalid_weights"
+    assert boolean_weight["error"]["code"] == "invalid_weights"
 
 
 def test_portfolio_insufficient_data_keeps_source_metadata(

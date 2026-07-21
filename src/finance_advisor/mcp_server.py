@@ -20,6 +20,7 @@ from finance_advisor.market.symbols import SymbolValidationError, normalize_symb
 from finance_advisor.risk.portfolio import PortfolioValidationError
 from finance_advisor.risk.service import (
     InvalidLookbackError,
+    PortfolioWeight,
     RiskDataUnavailableError,
     build_asset_risk_report,
     build_portfolio_risk_report,
@@ -230,7 +231,7 @@ def analyze_asset_risk(
 
 @mcp.tool()
 def analyze_portfolio_risk(
-    weights_pct: dict[str, float],
+    weights_pct: dict[str, PortfolioWeight],
     lookback_days: int = 252,
 ) -> dict[str, Any]:
     """计算1到4个白名单ETF固定权重组合的历史相关性、净值、回撤、VaR和CVaR。"""

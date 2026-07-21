@@ -1,3 +1,25 @@
+.risk-boundary-alert {
+  margin-bottom: 20px;
+  border-color: #b7cfe9;
+  background: #f4f8fc;
+}
+
+.risk-tabs > .ant-tabs-nav {
+  margin-bottom: 20px;
+  padding: 0 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: #fff;
+}
+
+.risk-tabs > .ant-tabs-nav::before {
+  border-bottom: 0;
+}
+
+.risk-control-card .ant-card-body {
+  padding: 18px 20px;
+}
+
 .risk-control-row {
   width: 100%;
 }
@@ -16,9 +38,169 @@
   margin-bottom: 16px;
 }
 
+.risk-source-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.risk-source-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
 .risk-result-meta ul {
   margin: 0;
   padding-left: 20px;
+}
+
+.risk-card-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.risk-profile-summary {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(280px, 1.3fr);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: #fff;
+}
+
+.risk-profile-score,
+.risk-profile-level {
+  display: flex;
+  align-items: center;
+  min-height: 112px;
+  padding: 20px 24px;
+}
+
+.risk-profile-score {
+  gap: 8px;
+  border-right: 1px solid var(--color-border);
+}
+
+.risk-profile-score span {
+  color: var(--color-text-secondary);
+}
+
+.risk-profile-score strong {
+  margin-left: auto;
+  color: var(--color-text-primary);
+  font-size: 34px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.risk-profile-score small {
+  align-self: flex-end;
+  margin-bottom: 22px;
+  color: var(--color-text-secondary);
+}
+
+.risk-profile-level {
+  gap: 14px;
+  color: var(--color-brand);
+}
+
+.risk-profile-level .ant-typography {
+  margin: 0;
+}
+
+.risk-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: #fff;
+}
+
+.risk-metric-grid > div {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  align-items: center;
+  min-width: 0;
+  gap: 5px 8px;
+  padding: 16px 18px;
+  color: var(--color-text-secondary);
+}
+
+.risk-metric-grid > div + div {
+  border-left: 1px solid var(--color-border);
+}
+
+.risk-metric-grid strong {
+  grid-column: 2;
+  overflow-wrap: anywhere;
+  color: var(--color-text-primary);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.risk-loss-value {
+  color: var(--color-up) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.risk-period-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  padding: 11px 14px;
+  border-left: 3px solid #4f7f5b;
+  background: #f5f8f5;
+  color: #405148;
+  font-size: 13px;
+}
+
+.risk-period-strip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.risk-methodology {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 20px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.risk-methodology span::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin: 0 8px 2px 0;
+  border-radius: 50%;
+  background: #6f879f;
+}
+
+@media (max-width: 1100px) {
+  .risk-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .risk-metric-grid > div:nth-child(3) {
+    border-top: 1px solid var(--color-border);
+    border-left: 0;
+  }
+
+  .risk-metric-grid > div:nth-child(4) {
+    border-top: 1px solid var(--color-border);
+  }
 }
 
 @media (max-width: 760px) {
@@ -33,5 +215,27 @@
 
   .risk-chart {
     height: 260px;
+  }
+
+  .risk-source-meta {
+    align-items: flex-end;
+    flex-direction: column;
+  }
+
+  .risk-profile-summary,
+  .risk-metric-grid,
+  .risk-methodology {
+    grid-template-columns: 1fr;
+  }
+
+  .risk-profile-score {
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .risk-metric-grid > div + div,
+  .risk-metric-grid > div:nth-child(4) {
+    border-top: 1px solid var(--color-border);
+    border-left: 0;
   }
 }
