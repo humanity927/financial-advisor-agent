@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import cast
+
 from finance_advisor.risk.profile import RISK_LEVELS, assess_profile
 from finance_advisor.schemas import InvestorProfileInput, LiquidityNeed
+
+ASSET_CLASSES = ("现金", "债券", "股票", "黄金")
 
 BASE_ALLOCATIONS: dict[str, dict[str, float]] = {
     "保守型": {"现金": 40.0, "债券": 45.0, "股票": 5.0, "黄金": 10.0},
@@ -44,6 +49,85 @@ def _rounded_percentages(allocation: dict[str, float]) -> dict[str, float]:
     return rounded
 
 
+def _validate_current_allocation_pct(
+    current_allocation_pct: Mapping[str, float],
+) -> dict[str, float]:
+    unknown_assets = sorted(set(current_allocation_pct) - set(ASSET_CLASSES))
+    if unknown_assets:
+        raise ValueError(f"当前配置包含不支持的资产类别：{', '.join(unknown_assets)}")
+
+    missing_assets = [asset for asset in ASSET_CLASSES if asset not in current_allocation_pct]
+    if missing_assets:
+        raise ValueError(f"当前配置缺少资产类别：{', '.join(missing_assets)}")
+
+    current = {
+        asset: round(float(current_allocation_pct[asset]), 1)
+        for asset in ASSET_CLASSES
+    }
+    if any(value < 0 for value in current.values()):
+        raise ValueError("当前配置比例不能为负数")
+
+    total = round(sum(current.values()), 1)
+    if total != 100.0:
+        raise ValueError(f"当前配置比例合计必须为100.0%，当前为{total}%")
+    return current
+
+
+def _allocation_deviation_pct(
+    suggested: Mapping[str, float],
+    current: Mapping[str, float],
+) -> dict[str, float]:
+    deviation = {
+        asset: round(float(suggested[asset]) - float(current[asset]), 1)
+        for asset in ASSET_CLASSES
+    }
+    residual = round(0.0 - sum(deviation.values()), 1)
+    deviation["现金"] = round(deviation["现金"] + residual, 1)
+    return deviation
+
+
+def _adjustment_steps(
+    *,
+    scored_risk_level: str,
+    effective_risk_level: str,
+    constraints: list[str],
+    has_current_allocation: bool,
+) -> list[str]:
+    steps = [
+        f"根据用户画像评分得到基础风险等级：{scored_risk_level}",
+    ]
+    if effective_risk_level != scored_risk_level:
+        steps.append(f"受硬约束影响，将有效风险等级调整为：{effective_risk_level}")
+    else:
+        steps.append(f"未触发风险等级下调，沿用有效风险等级：{effective_risk_level}")
+
+    steps.extend(f"应用硬约束：{constraint}" for constraint in constraints)
+    steps.append("在不修改基础权重的前提下生成四类资产建议比例")
+    if has_current_allocation:
+        steps.append("将建议比例与当前比例逐项比较，生成配置偏离")
+    return steps
+
+
+def _rationale(
+    *,
+    effective_risk_level: str,
+    constraints: list[str],
+    allocation_pct: Mapping[str, float],
+) -> list[str]:
+    reasons = [
+        f"有效风险等级为{effective_risk_level}，因此使用对应的基础配置模板",
+        "配置仅覆盖现金、债券、股票、黄金四类资产，不生成交易指令",
+    ]
+    if constraints:
+        reasons.append("已优先满足最大亏损、投资期限、流动性和应急资金等硬约束")
+    if allocation_pct["现金"] >= 30:
+        reasons.append("现金比例较高，用于覆盖短期流动性和应急资金需求")
+    if allocation_pct["股票"] <= 10:
+        reasons.append("股票比例受到期限或最大亏损约束控制，避免过度承担波动")
+    reasons.append("所有比例和金额来自确定性规则，模型只负责解释，不改写配置结果")
+    return reasons
+
+
 def build_portfolio_allocation(profile: InvestorProfileInput) -> dict[str, object]:
     assessment = assess_profile(profile)
     effective_level = assessment.risk_level
@@ -82,3 +166,37 @@ def build_portfolio_allocation(profile: InvestorProfileInput) -> dict[str, objec
         "total_amount_cny": round(profile.amount_cny, 2),
         "method": "透明规则配置，不依据短期涨跌追涨杀跌",
     }
+
+
+def build_portfolio_plan(
+    profile: InvestorProfileInput,
+    current_allocation_pct: Mapping[str, float] | None = None,
+) -> dict[str, object]:
+    allocation = build_portfolio_allocation(profile)
+    suggested_pct = cast(dict[str, float], allocation["allocation_pct"])
+    constraints = cast(list[str], allocation["constraints_applied"])
+    current_pct = (
+        _validate_current_allocation_pct(current_allocation_pct)
+        if current_allocation_pct is not None
+        else None
+    )
+
+    plan = dict(allocation)
+    plan["adjustment_steps"] = _adjustment_steps(
+        scored_risk_level=cast(str, allocation["scored_risk_level"]),
+        effective_risk_level=cast(str, allocation["effective_risk_level"]),
+        constraints=constraints,
+        has_current_allocation=current_pct is not None,
+    )
+    plan["rationale"] = _rationale(
+        effective_risk_level=cast(str, allocation["effective_risk_level"]),
+        constraints=constraints,
+        allocation_pct=suggested_pct,
+    )
+    plan["current_allocation_pct"] = current_pct
+    plan["allocation_deviation_pct"] = (
+        _allocation_deviation_pct(suggested_pct, current_pct)
+        if current_pct is not None
+        else None
+    )
+    return plan
