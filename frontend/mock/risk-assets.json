@@ -1,0 +1,49 @@
+{
+  "ok": true,
+  "data": {
+    "assets": [
+      {
+        "symbol": "510300",
+        "name": "沪深300ETF",
+        "asset_class": "股票",
+        "metrics": {
+          "observation_count": 252,
+          "start_date": "2025-07-17",
+          "end_date": "2026-07-17",
+          "annual_return_pct": 4.12,
+          "annual_volatility_pct": 16.87,
+          "max_drawdown_pct": -11.23,
+          "daily_var_95_pct": 1.72,
+          "daily_cvar_95_pct": 2.48
+        },
+        "source": "fixture",
+        "warning": "演示数据/非实时数据"
+      },
+      {
+        "symbol": "511010",
+        "name": "国债ETF",
+        "asset_class": "债券",
+        "metrics": {
+          "observation_count": 252,
+          "start_date": "2025-07-17",
+          "end_date": "2026-07-17",
+          "annual_return_pct": 2.01,
+          "annual_volatility_pct": 3.42,
+          "max_drawdown_pct": -1.85,
+          "daily_var_95_pct": 0.35,
+          "daily_cvar_95_pct": 0.51
+        },
+        "source": "fixture",
+        "warning": "演示数据/非实时数据"
+      }
+    ],
+    "method": "历史数据统计，不代表未来表现"
+  },
+  "meta": {
+    "source": "fixture",
+    "as_of": "2026-07-17",
+    "request_id": "mock-risk-assets",
+    "is_fallback": true
+  },
+  "warnings": ["演示数据/非实时数据"]
+}

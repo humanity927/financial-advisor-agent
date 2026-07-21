@@ -7,13 +7,7 @@ import PageState from './components/PageState';
 
 const MarketPage = lazy(() => import('./features/market/MarketPage'));
 const PortfolioPage = lazy(() => import('./features/portfolio/PortfolioPage'));
-
-const LazyPage = ({ title }: { title: string }) => (
-  <div style={{ padding: 48, color: '#667085', textAlign: 'center' }}>
-    <h3 style={{ marginBottom: 8, color: '#17212B' }}>{title}</h3>
-    <p>由功能负责人独立开发中</p>
-  </div>
-);
+const RiskPage = lazy(() => import('./features/risk/RiskPage'));
 
 export default function App() {
   return (
@@ -29,7 +23,14 @@ export default function App() {
               </Suspense>
             }
           />
-          <Route path="risk" element={<LazyPage title="风险实验室" />} />
+          <Route
+            path="risk"
+            element={
+              <Suspense fallback={<PageState state="loading" />}>
+                <RiskPage />
+              </Suspense>
+            }
+          />
           <Route
             path="portfolio"
             element={

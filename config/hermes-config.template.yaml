@@ -36,6 +36,7 @@ mcp_servers:
         - get_market_snapshot
         - assess_investor_profile
         - analyze_asset_risk
+        - analyze_portfolio_risk
         - build_allocation
       resources: false
       prompts: false

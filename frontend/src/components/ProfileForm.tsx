@@ -6,6 +6,8 @@ const { Title } = Typography;
 interface ProfileFormProps {
   onSubmit: (values: ProfileInput) => void;
   loading?: boolean;
+  submitLabel?: string;
+  submitTestId?: string;
   symbols?: string[];
   onSymbolsChange?: (symbols: string[]) => void;
 }
@@ -39,6 +41,8 @@ const SYMBOL_OPTIONS = [
 export default function ProfileForm({
   onSubmit,
   loading = false,
+  submitLabel = '生成报告',
+  submitTestId,
   symbols,
   onSymbolsChange,
 }: ProfileFormProps) {
@@ -108,8 +112,8 @@ export default function ProfileForm({
           )}
 
           <Form.Item>
-            <Button type="primary" htmlType="submit" loading={loading} block>
-              生成报告
+            <Button type="primary" htmlType="submit" loading={loading} block data-testid={submitTestId}>
+              {submitLabel}
             </Button>
           </Form.Item>
         </Space>

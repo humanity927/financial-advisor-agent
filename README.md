@@ -85,9 +85,14 @@ FINANCE_FORCE_FIXTURE=0
 GET  /api/health
 GET  /api/market/snapshot?symbols=510300,511010,518880,511880
 POST /api/market/compare
+POST /api/risk/profile
+POST /api/risk/assets
+POST /api/risk/portfolio
 ```
 
 行情端点支持 1 到 4 个白名单 ETF。快照接口供总览页使用；`POST /api/market/compare` 的 `range` 可选 `1M`、`3M`、`1Y`，返回共同交易日对齐后的归一化曲线、20/60/252 交易日收益、行情快照、数据来源、时间和 fallback warning。多标的读取采用最多 4 路受控并发，端点使用确定性服务，不注册为 MCP 工具。
+
+风险端点复用 `risk/profile.py`、`risk/metrics.py` 和 `risk/portfolio.py` 的确定性计算：`/api/risk/profile` 返回六维画像，`/api/risk/assets` 返回单资产历史风险指标，`/api/risk/portfolio` 返回组合风险、相关性、净值和回撤曲线。所有结果都带有数据来源、时间和演示/回退告警；历史统计不代表未来收益。
 
 ## 演示问题
 
