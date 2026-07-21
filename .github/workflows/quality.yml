@@ -20,9 +20,36 @@ jobs:
         run: ./scripts/bootstrap.ps1 -SkipDoctor
       - name: Quality checks
         shell: pwsh
+        env:
+          FINANCE_FORCE_FIXTURE: "1"
         run: |
           ./.venv/Scripts/ruff.exe format --check .
           ./.venv/Scripts/ruff.exe check .
           ./.venv/Scripts/mypy.exe src
+          ./.venv/Scripts/python.exe -m pip check
           ./.venv/Scripts/pytest.exe --cov=finance_advisor --cov-fail-under=85
           ./scripts/verify-hermes.ps1
+
+  windows-frontend:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
+      - name: Frontend quality checks
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run test
+          npm run build
+          npm run e2e

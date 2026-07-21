@@ -1,0 +1,66 @@
+{
+  "ok": true,
+  "data": {
+    "symbols": [
+      {"symbol": "510300", "name": "沪深300ETF", "asset_class": "股票"}
+    ],
+    "range_days": 20,
+    "common_start_date": "2026-06-19",
+    "latest_trade_date": "2026-07-17",
+    "observation_count": 253,
+    "normalized_series": [
+      {
+        "symbol": "510300",
+        "name": "沪深300ETF",
+        "asset_class": "股票",
+        "points": [
+          {"date": "2026-06-19", "close": 4.2031, "normalized": 100.0},
+          {"date": "2026-07-17", "close": 4.3022, "normalized": 102.357}
+        ]
+      }
+    ],
+    "interval_returns": [
+      {
+        "symbol": "510300",
+        "name": "沪深300ETF",
+        "asset_class": "股票",
+        "returns": {"20d": 2.357, "60d": 5.2194, "252d": 11.4038}
+      }
+    ],
+    "snapshots": [
+      {
+        "symbol": "510300",
+        "name": "沪深300ETF",
+        "asset_class": "股票",
+        "latest_price": 4.3022,
+        "previous_close": 4.2791,
+        "daily_change_pct": 0.5398,
+        "trade_date": "2026-07-17",
+        "source": "fixture",
+        "origin_source": null,
+        "is_fallback": true,
+        "warning": "演示数据/非实时数据，固定数据日期为 2026-07-17"
+      }
+    ],
+    "source_details": [
+      {
+        "symbol": "510300",
+        "name": "沪深300ETF",
+        "source": "fixture",
+        "origin_source": null,
+        "fetched_at": "2026-07-20T10:00:00+08:00",
+        "is_fallback": true,
+        "warning": "演示数据/非实时数据，固定数据日期为 2026-07-17"
+      }
+    ],
+    "method": "共同交易日对齐，不前向填充缺口；历史表现不代表未来收益",
+    "warnings": []
+  },
+  "meta": {
+    "source": "fixture",
+    "as_of": "2026-07-17",
+    "request_id": "00000000-0000-0000-0000-000000000000",
+    "is_fallback": true
+  },
+  "warnings": ["演示数据/非实时数据，固定数据日期为 2026-07-17"]
+}
