@@ -115,6 +115,7 @@ export interface CatalogSearchData {
   items: CatalogSymbol[];
   catalog_fetched_at: string | null;
   query: string;
+  selection_note?: string | null;
 }
 
 export interface WatchlistData {

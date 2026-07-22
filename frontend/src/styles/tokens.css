@@ -1,39 +1,51 @@
 :root {
-  /* 背景 & 表面 */
-  --color-bg:         #F4F6F7;
-  --color-surface:    #FFFFFF;
-  --color-border:     #D9E0E5;
+  --color-bg: #f3f5f6;
+  --color-bg-subtle: #f8f9fa;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f6f8f8;
+  --color-border: #d9e0e2;
+  --color-border-strong: #c4ced1;
 
-  /* 文字 */
-  --color-text-primary:   #17212B;
-  --color-text-secondary: #667085;
+  --color-text-primary: #182226;
+  --color-text-secondary: #647176;
+  --color-text-tertiary: #879297;
 
-  /* 涨跌（中国市场红涨绿跌） */
-  --color-up:     #CF1322;
-  --color-down:   #3F8600;
+  /* 中国市场：红涨绿跌 */
+  --color-up: #c63f4a;
+  --color-down: #16855b;
+  --color-warning: #b7791f;
+  --color-danger: #b93844;
+  --color-info: #2f6f9f;
 
-  /* 品牌 */
-  --color-brand:  #1A5FB4;
+  --color-brand: #165d59;
+  --color-brand-hover: #0f766e;
+  --color-brand-soft: #eaf4f2;
+  --color-brand-ink: #104744;
 
-  /* 图表色板 */
-  --chart-color-1: #2B7BD6;
-  --chart-color-2: #D4883A;
-  --chart-color-3: #52C41A;
-  --chart-color-4: #FA8C16;
+  --chart-color-1: #2f6f9f;
+  --chart-color-2: #b98932;
+  --chart-color-3: #16855b;
+  --chart-color-4: #c63f4a;
+  --chart-color-5: #7a6b9d;
+  --chart-color-6: #5f7b83;
 
-  /* 间距 */
   --space-xs: 4px;
   --space-sm: 8px;
+  --space-3: 12px;
   --space-md: 16px;
+  --space-5: 20px;
   --space-lg: 24px;
   --space-xl: 32px;
 
-  /* 圆角 */
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
+  --shadow-surface: 0 1px 2px rgba(24, 34, 38, 0.04);
+  --shadow-overlay: 0 12px 32px rgba(24, 34, 38, 0.16);
 
-  /* 布局 */
-  --sidebar-width: 224px;
-  --topbar-height: 54px;
+  --sidebar-width: 228px;
+  --sidebar-collapsed-width: 72px;
+  --topbar-height: 56px;
+  --content-max-width: 1520px;
+  --profile-sidebar-width: 336px;
 }

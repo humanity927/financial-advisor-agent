@@ -1,4 +1,4 @@
-import { ArrowUpOutlined, ArrowDownOutlined, MinusOutlined } from '@ant-design/icons';
+import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
 
 type MetricType = 'price' | 'pct' | 'money';
 
@@ -31,10 +31,16 @@ export default function MetricValue({ value, type = 'price', precision, prefix, 
   }
 
   return (
-    <span className={isUp ? 'text-up' : isDown ? 'text-down' : ''}>
+    <span className={`financial-number ${isUp ? 'text-up' : isDown ? 'text-down' : ''}`.trim()}>
       {prefix}{formatted}{suffix}
       {' '}
-      {isUp ? <ArrowUpOutlined /> : isDown ? <ArrowDownOutlined /> : <MinusOutlined />}
+      {isUp ? (
+        <ArrowUp size={13} aria-hidden="true" />
+      ) : isDown ? (
+        <ArrowDown size={13} aria-hidden="true" />
+      ) : (
+        <Minus size={13} aria-hidden="true" />
+      )}
       {type === 'money' && ' 元'}
     </span>
   );

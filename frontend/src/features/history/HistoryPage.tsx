@@ -11,6 +11,7 @@ import {
   Space,
   Table,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd';
 import type { TableColumnsType } from 'antd';
@@ -110,9 +111,15 @@ export default function HistoryPage() {
       title: '操作', key: 'actions', width: 156, fixed: 'right',
       render: (_, row) => (
         <Space size="small">
-          <Button type="text" icon={<Eye size={15} />} aria-label={`查看 ${row.title}`} onClick={() => setDetailId(row.id)} />
-          <Button type="text" icon={<MessageSquare size={15} />} aria-label={`继续 ${row.title}`} onClick={() => resumeSession(row.id)} />
-          <Button type="text" danger icon={<Trash2 size={15} />} aria-label={`删除 ${row.title}`} onClick={() => confirmDelete(row.id)} />
+          <Tooltip title="查看详情">
+            <Button type="text" icon={<Eye size={15} />} aria-label={`查看 ${row.title}`} onClick={() => setDetailId(row.id)} />
+          </Tooltip>
+          <Tooltip title="继续咨询">
+            <Button type="text" icon={<MessageSquare size={15} />} aria-label={`继续 ${row.title}`} onClick={() => resumeSession(row.id)} />
+          </Tooltip>
+          <Tooltip title="删除记录">
+            <Button type="text" danger icon={<Trash2 size={15} />} aria-label={`删除 ${row.title}`} onClick={() => confirmDelete(row.id)} />
+          </Tooltip>
         </Space>
       ),
     },
@@ -122,7 +129,7 @@ export default function HistoryPage() {
   const detail = detailQuery.data?.data;
 
   return (
-    <div>
+    <div className="page-layout history-page">
       <SectionHeader
         title="历史记录"
         subtitle="恢复、查看或删除保存在本机 .runtime 的咨询会话"
@@ -130,22 +137,24 @@ export default function HistoryPage() {
       />
       {listQuery.isError && <Alert type="error" showIcon message="历史记录加载失败" description={listQuery.error instanceof Error ? listQuery.error.message : '请求失败'} />}
       {!listQuery.isLoading && !listQuery.isError && sessions.length === 0 ? (
-        <Empty description="暂无咨询记录" />
+        <div className="page-state"><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无咨询记录" /></div>
       ) : (
-        <Table
-          loading={listQuery.isLoading}
-          dataSource={sessions}
-          columns={columns}
-          rowKey="id"
-          pagination={{ pageSize: 10, hideOnSinglePage: true }}
-          scroll={{ x: 900 }}
-          size="middle"
-        />
+        <div className="data-table-surface">
+          <Table
+            loading={listQuery.isLoading}
+            dataSource={sessions}
+            columns={columns}
+            rowKey="id"
+            pagination={{ pageSize: 10, hideOnSinglePage: true }}
+            scroll={{ x: 900 }}
+            size="middle"
+          />
+        </div>
       )}
 
       <Drawer
         title={detail?.title ?? '会话详情'}
-        width={720}
+        width="min(720px, 100vw)"
         open={Boolean(detailId)}
         onClose={() => setDetailId(null)}
         extra={detail && <Button type="primary" onClick={() => resumeSession(detail.id)}>继续咨询</Button>}

@@ -89,6 +89,25 @@ def test_catalog_search_supports_code_name_and_empty_results(client: TestClient)
     assert empty.json()["data"]["items"] == []
 
 
+def test_catalog_representative_view_uses_validated_directory(client: TestClient) -> None:
+    response = client.get(
+        "/api/market/catalog/search",
+        params={"q": "", "refresh": "false", "representative": "true"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [item["symbol"] for item in payload["data"]["items"]] == [
+        "000001",
+        "000300",
+        "000905",
+        "399006",
+        "511010",
+        "518880",
+    ]
+    assert "大盘" in payload["data"]["selection_note"]
+
+
 def test_watchlist_persists_add_switch_compare_remove_and_fallback(client: TestClient) -> None:
     empty = client.get("/api/market/watchlist")
     assert empty.json()["data"]["items"] == []

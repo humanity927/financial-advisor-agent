@@ -10,7 +10,7 @@
     "fixture_path": "data/fixtures/market_data.json",
     "fixture_available": true,
     "force_fixture": true,
-    "supported_symbol_count": 4
+    "supported_symbol_count": 10
   },
   "meta": {
     "source": "system",

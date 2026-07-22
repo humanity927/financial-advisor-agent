@@ -1,80 +1,281 @@
 .shell {
   min-height: 100vh;
-  overflow-x: hidden;
-}
-
-.shell .ant-layout-sider {
-  position: fixed !important;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  z-index: 100;
-}
-
-.shell .ant-layout-sider ~ .ant-layout {
-  margin-left: var(--sidebar-width);
-}
-
-.shell-content {
-  margin-top: var(--topbar-height);
-  padding: var(--space-lg);
-  min-height: calc(100vh - var(--topbar-height));
-  overflow-y: auto;
+  overflow-x: clip;
   background: var(--color-bg);
 }
 
-/* Card 微弱阴影 */
-.shell-content .ant-card {
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  border-radius: var(--radius-lg);
+.shell-sidebar.ant-layout-sider {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 120;
+  height: 100vh;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: none;
+}
+
+.shell-sidebar-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.shell-brand {
+  display: flex;
+  flex: 0 0 var(--topbar-height);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 0 18px;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-brand-ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.shell-brand:hover {
+  background: var(--color-surface-muted);
+}
+
+.shell-brand-mark,
+.topbar-brand-mark {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.shell-brand-mark img,
+.topbar-brand-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.shell-brand-mark {
+  width: 32px;
+  height: 32px;
+}
+
+.shell-brand-name {
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.shell-primary-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-top: 8px;
+  overflow-y: auto;
+}
+
+.shell-primary-nav .ant-menu,
+.shell-bottom-nav .ant-menu {
+  border-inline-end: 0 !important;
+  background: transparent;
+}
+
+.shell-primary-nav .ant-menu-item,
+.shell-bottom-nav .ant-menu-item {
+  color: #435157;
+}
+
+.shell-primary-nav .ant-menu-item-selected,
+.shell-bottom-nav .ant-menu-item-selected {
+  font-weight: 600;
+}
+
+.shell-bottom-nav {
+  flex: 0 0 auto;
+  padding: 9px 0 10px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-subtle);
+}
+
+.shell-nav-caption {
+  display: block;
+  padding: 0 20px 5px;
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+}
+
+.shell-main {
+  min-width: 0;
+  margin-left: var(--sidebar-width);
+  transition: margin-left 180ms ease;
+}
+
+.shell-collapsed:not(.shell-mobile) .shell-main {
+  margin-left: var(--sidebar-collapsed-width);
+}
+
+.shell-collapsed:not(.shell-mobile) .shell-brand {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.shell-collapsed:not(.shell-mobile) .shell-brand-name,
+.shell-collapsed:not(.shell-mobile) .shell-nav-caption {
+  display: none;
+}
+
+.shell-topbar {
+  position: fixed;
+  inset: 0 0 auto var(--sidebar-width);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  height: var(--topbar-height);
+  padding: 0 20px;
+  border-bottom: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
+  transition: left 180ms ease;
+}
+
+.shell-collapsed:not(.shell-mobile) .shell-topbar {
+  left: var(--sidebar-collapsed-width);
+}
+
+.shell-nav-toggle.ant-btn {
+  display: inline-grid;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  place-items: center;
+  color: #46565b;
+}
+
+.topbar-mobile-brand {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-left: 8px;
+  color: var(--color-brand-ink);
+}
+
+.topbar-brand-mark {
+  width: 26px;
+  height: 26px;
+}
+
+.topbar-mobile-brand strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-spacer {
+  flex: 1;
+}
+
+.topbar-status-group,
+.topbar-provider-status {
+  display: flex;
+  align-items: center;
+}
+
+.topbar-status-group {
+  min-width: 0;
+  gap: 12px;
+}
+
+.topbar-provider-status {
+  gap: 5px;
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.shell-content {
+  min-height: 100vh;
+  padding: calc(var(--topbar-height) + 18px) 20px 24px;
+  background: var(--color-bg);
+}
+
+.shell-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 115;
+  border: 0;
+  background: rgba(18, 28, 31, 0.38);
+  cursor: pointer;
 }
 
 @media (max-width: 991px) {
-  .shell .ant-layout-sider ~ .ant-layout {
+  .shell-main,
+  .shell-collapsed .shell-main {
     margin-left: 0;
   }
 
-  .shell-topbar {
-    left: 0 !important;
-    padding-left: 56px !important;
+  .shell-topbar,
+  .shell-collapsed .shell-topbar {
+    left: 0;
+  }
+
+  .shell-sidebar.ant-layout-sider:not(.ant-layout-sider-collapsed) {
+    box-shadow: var(--shadow-overlay);
+  }
+
+  .topbar-mobile-brand {
+    display: flex;
   }
 
   .shell-content {
-    padding: var(--space-md);
-  }
-
-  .shell .ant-layout-sider-zero-width-trigger {
-    position: fixed;
-    top: 7px;
-    bottom: auto;
-    right: auto;
-    left: 0;
-    inset-inline-start: 0;
-    inset-inline-end: auto;
-    z-index: 110;
+    padding: calc(var(--topbar-height) + 16px) 16px 20px;
   }
 }
 
 @media (max-width: 600px) {
   .shell-topbar {
-    gap: 6px !important;
-    padding-right: 8px !important;
-    overflow: hidden;
+    padding-inline: 10px;
   }
 
-  .shell-topbar .ant-tag,
-  .shell-topbar span {
-    white-space: nowrap;
+  .topbar-status-group {
+    gap: 6px;
   }
 
   .topbar-provider-status {
-    min-width: 0;
+    max-width: 112px;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-size: 11px !important;
+    font-size: 11px;
+  }
+
+  .topbar-provider-status svg {
+    display: none;
   }
 
   .shell-content {
-    padding: 12px;
+    padding: calc(var(--topbar-height) + 12px) 12px 18px;
+  }
+}
+
+@media (max-height: 560px) {
+  .shell-primary-nav {
+    padding-top: 2px;
+  }
+
+  .shell-primary-nav .ant-menu-item,
+  .shell-bottom-nav .ant-menu-item {
+    height: 36px;
+    line-height: 36px;
+  }
+
+  .shell-bottom-nav {
+    padding-block: 4px;
+  }
+
+  .shell-nav-caption {
+    display: none;
   }
 }

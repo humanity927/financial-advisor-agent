@@ -1,8 +1,6 @@
 import { useEffect } from 'react';
-import { Form, InputNumber, Select, Button, Card, Typography, Space } from 'antd';
+import { Form, InputNumber, Select, Button, Card } from 'antd';
 import type { CatalogSymbol, ProfileInput } from '../api/types';
-
-const { Title } = Typography;
 
 interface ProfileFormProps {
   onSubmit: (values: ProfileInput) => void;
@@ -66,8 +64,7 @@ export default function ProfileForm({
   };
 
   return (
-    <Card>
-      <Title level={5} style={{ marginTop: 0 }}>投资者画像</Title>
+    <Card title="投资者画像" className="profile-form-card">
       <Form
         form={form}
         layout="vertical"
@@ -84,7 +81,6 @@ export default function ProfileForm({
           ...initialValues,
         }}
       >
-        <Space direction="vertical" style={{ width: '100%' }} size="small">
           <Form.Item label="投资金额（元）" name="amount_cny" rules={[{ required: true, type: 'number', min: 1, max: 1_000_000_000 }]}>
             <InputNumber style={{ width: '100%' }} min={1} max={1_000_000_000} />
           </Form.Item>
@@ -141,7 +137,6 @@ export default function ProfileForm({
               {submitLabel}
             </Button>
           </Form.Item>
-        </Space>
       </Form>
     </Card>
   );

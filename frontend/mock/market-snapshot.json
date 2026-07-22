@@ -53,6 +53,58 @@
         "origin_source": null,
         "is_fallback": true,
         "warning": "演示数据/非实时数据"
+      },
+      {
+        "symbol": "000001",
+        "name": "上证指数",
+        "asset_class": "股票",
+        "latest_price": 3520.18,
+        "previous_close": 3502.42,
+        "daily_change_pct": 0.5071,
+        "trade_date": "2026-07-17",
+        "source": "fixture",
+        "origin_source": null,
+        "is_fallback": true,
+        "warning": "演示数据/非实时数据"
+      },
+      {
+        "symbol": "000300",
+        "name": "沪深300指数",
+        "asset_class": "股票",
+        "latest_price": 4215.64,
+        "previous_close": 4206.87,
+        "daily_change_pct": 0.2085,
+        "trade_date": "2026-07-17",
+        "source": "fixture",
+        "origin_source": null,
+        "is_fallback": true,
+        "warning": "演示数据/非实时数据"
+      },
+      {
+        "symbol": "000905",
+        "name": "中证500指数",
+        "asset_class": "股票",
+        "latest_price": 6328.41,
+        "previous_close": 6350.12,
+        "daily_change_pct": -0.3419,
+        "trade_date": "2026-07-17",
+        "source": "fixture",
+        "origin_source": null,
+        "is_fallback": true,
+        "warning": "演示数据/非实时数据"
+      },
+      {
+        "symbol": "399006",
+        "name": "创业板指",
+        "asset_class": "股票",
+        "latest_price": 2286.73,
+        "previous_close": 2274.58,
+        "daily_change_pct": 0.5342,
+        "trade_date": "2026-07-17",
+        "source": "fixture",
+        "origin_source": null,
+        "is_fallback": true,
+        "warning": "演示数据/非实时数据"
       }
     ]
   },

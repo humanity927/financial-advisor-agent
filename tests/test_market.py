@@ -76,6 +76,22 @@ def test_symbol_aliases_and_limits() -> None:
         raise AssertionError("expected SymbolValidationError")
 
 
+def test_catalog_representatives_cover_market_styles_and_asset_directions(
+    tmp_path: Path,
+) -> None:
+    representatives = SymbolCatalog(tmp_path / "catalog.json").representatives()
+
+    assert [item.symbol for item in representatives] == [
+        "000001",
+        "000300",
+        "000905",
+        "399006",
+        "511010",
+        "518880",
+    ]
+    assert all(item.asset_type in {"index", "etf"} for item in representatives)
+
+
 def test_fixture_is_deterministic_and_marked_non_realtime() -> None:
     provider = FixtureProvider(_fixture_path())
     symbol = normalize_symbol("510300")

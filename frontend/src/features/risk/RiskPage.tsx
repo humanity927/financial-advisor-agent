@@ -35,6 +35,7 @@ import PageState from '../../components/PageState';
 import SectionHeader from '../../components/SectionHeader';
 import SourceStamp from '../../components/SourceStamp';
 import MetricValue from '../../components/MetricValue';
+import WorkspaceLayout from '../../components/WorkspaceLayout';
 import { queryKeys } from '../../api/keys';
 import type {
   AssetRiskData,
@@ -258,16 +259,24 @@ function ProfilePanel() {
   });
   const response = mutation.data;
   return (
-    <Row gutter={[24, 24]}>
-      <Col xs={24} lg={8}><ProfileForm onSubmit={(values) => { workspace.patchProfile(values); mutation.mutate(values); }} initialValues={workspace.profile} onValuesChange={workspace.patchProfile} loading={mutation.isPending} submitLabel="评估风险画像" submitTestId="risk-profile-submit" /></Col>
-      <Col xs={24} lg={16}>
+    <WorkspaceLayout
+      sidebar={(
+        <ProfileForm
+          onSubmit={(values) => { workspace.patchProfile(values); mutation.mutate(values); }}
+          initialValues={workspace.profile}
+          onValuesChange={workspace.patchProfile}
+          loading={mutation.isPending}
+          submitLabel="评估风险画像"
+          submitTestId="risk-profile-submit"
+        />
+      )}
+    >
         {mutation.isPending && <PageState state="loading" />}
         {mutation.isError && <PageState state="error" error={mutation.error instanceof Error ? mutation.error.message : '风险画像请求失败'} onRetry={() => mutation.variables && mutation.mutate(mutation.variables)} />}
         {!mutation.isPending && !mutation.isError && !response && <PageState state="empty" emptyDescription="填写左侧画像信息后开始评估" />}
         {response && !response.ok && <PageState state="error" error={responseError(response)} onRetry={() => mutation.variables && mutation.mutate(mutation.variables)} />}
         {response?.ok && <><ResultNotice source={response.meta.source} isFallback={response.meta.is_fallback} asOf={response.meta.as_of} warnings={response.warnings} /><ProfileResult profile={response.data} /></>}
-      </Col>
-    </Row>
+    </WorkspaceLayout>
   );
 }
 
@@ -342,7 +351,7 @@ function PortfolioPanel() {
 
 export default function RiskPage() {
   return (
-    <div className="risk-page">
+    <div className="page-layout risk-page">
       <SectionHeader title="风险实验室" subtitle="用可复现的历史统计理解投资者画像、资产风险与组合波动" />
       <Alert
         type="info"

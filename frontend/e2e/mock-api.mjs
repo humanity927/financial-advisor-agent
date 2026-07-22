@@ -61,7 +61,13 @@ const catalogItems = [
   { symbol: '518880', name: '黄金ETF', asset_class: '黄金', market: 'SH', asset_type: 'etf', provider_symbol: null },
   { symbol: '511880', name: '货币ETF', asset_class: '现金', market: 'SH', asset_type: 'etf', provider_symbol: null },
   { symbol: '000001', name: '上证指数', asset_class: '股票', market: 'SH', asset_type: 'index', provider_symbol: 'sh000001' },
+  { symbol: '000300', name: '沪深300指数', asset_class: '股票', market: 'SH', asset_type: 'index', provider_symbol: 'sh000300' },
+  { symbol: '000905', name: '中证500指数', asset_class: '股票', market: 'SH', asset_type: 'index', provider_symbol: 'sh000905' },
+  { symbol: '000852', name: '中证1000指数', asset_class: '股票', market: 'SH', asset_type: 'index', provider_symbol: 'sh000852' },
+  { symbol: '399001', name: '深证成指', asset_class: '股票', market: 'SZ', asset_type: 'index', provider_symbol: 'sz399001' },
+  { symbol: '399006', name: '创业板指', asset_class: '股票', market: 'SZ', asset_type: 'index', provider_symbol: 'sz399006' },
 ];
+const representativeSymbols = ['000001', '000300', '000905', '399006', '511010', '518880'];
 const sessions = new Map();
 const activeRuns = new Map();
 const cancelledRuns = new Set();
@@ -213,15 +219,31 @@ const server = createServer(async (request, response) => {
     return;
   }
   if (request.method === 'GET' && url.pathname === '/api/market/snapshot') {
-    sendJson(response, 200, fixtures.marketSnapshot);
+    const requested = new Set((url.searchParams.get('symbols') ?? '').split(',').filter(Boolean));
+    sendJson(response, 200, {
+      ...fixtures.marketSnapshot,
+      data: {
+        snapshots: fixtures.marketSnapshot.data.snapshots.filter(
+          (item) => requested.size === 0 || requested.has(item.symbol),
+        ),
+      },
+    });
     return;
   }
   if (request.method === 'GET' && url.pathname === '/api/market/catalog/search') {
     const query = (url.searchParams.get('q') ?? '').toLowerCase();
-    const items = catalogItems.filter(
-      (item) => item.symbol.includes(query) || item.name.toLowerCase().includes(query),
-    );
-    sendJson(response, 200, envelope({ items, catalog_fetched_at: '2026-07-21T09:00:00+08:00', query }, 'akshare'));
+    const representative = url.searchParams.get('representative') === 'true' && !query;
+    const items = representative
+      ? representativeSymbols.map((symbol) => catalogItems.find((item) => item.symbol === symbol))
+      : catalogItems.filter(
+          (item) => item.symbol.includes(query) || item.name.toLowerCase().includes(query),
+        );
+    sendJson(response, 200, envelope({
+      items,
+      catalog_fetched_at: '2026-07-21T09:00:00+08:00',
+      query,
+      selection_note: representative ? '覆盖大盘、核心宽基、中小盘、成长、债券与黄金方向' : null,
+    }, 'akshare'));
     return;
   }
   if (request.method === 'GET' && url.pathname === '/api/market/watchlist') {

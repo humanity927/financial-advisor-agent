@@ -1,7 +1,7 @@
-import { Spin, Empty, Alert, Button, Card } from 'antd';
-import { ReloadOutlined, WarningOutlined } from '@ant-design/icons';
-import SourceStamp from './SourceStamp';
+import { Alert, Button, Empty, Spin } from 'antd';
+import { RefreshCw, TriangleAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
+import SourceStamp from './SourceStamp';
 
 type PageStateVariant = 'loading' | 'empty' | 'error' | 'fixture' | 'partial' | 'success';
 
@@ -28,39 +28,35 @@ export default function PageState({
 }: PageStateProps) {
   if (state === 'loading') {
     return (
-      <Card>
-        <Spin tip="加载中..." style={{ display: 'flex', justifyContent: 'center', padding: 64 }}>
-          <div style={{ height: 1 }} />
-        </Spin>
-      </Card>
+      <div className="page-state page-state-loading" role="status" aria-live="polite">
+        <span className="page-state-loading-copy"><Spin /><span>加载中...</span></span>
+      </div>
     );
   }
 
   if (state === 'empty') {
     return (
-      <Card>
-        <Empty description={emptyDescription ?? '暂无数据'} />
-      </Card>
+      <div className="page-state">
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyDescription ?? '暂无数据'} />
+      </div>
     );
   }
 
   if (state === 'error') {
     return (
-      <Card>
+      <div className="page-state">
         <Alert
           type="error"
           showIcon
           message="加载失败"
           description={error ?? '请求异常，请稍后重试'}
-          action={
-            onRetry ? (
-              <Button size="small" icon={<ReloadOutlined />} onClick={onRetry}>
-                重试
-              </Button>
-            ) : null
-          }
+          action={onRetry ? (
+            <Button size="small" icon={<RefreshCw size={14} />} onClick={onRetry}>
+              重试
+            </Button>
+          ) : null}
         />
-      </Card>
+      </div>
     );
   }
 
@@ -68,12 +64,12 @@ export default function PageState({
     return (
       <>
         <Alert
+          className="page-state-notice"
           type="warning"
           showIcon
-          icon={<WarningOutlined />}
-          message="演示模式"
-          description="当前使用演示数据，非实时行情。请配置模型 API Key 以获取完整功能。"
-          style={{ marginBottom: 16 }}
+          icon={<TriangleAlert size={16} />}
+          message="演示数据 / 非实时数据"
+          description="当前结果来自测试演示源，不代表实时市场状态。"
         />
         {children}
       </>
@@ -84,48 +80,37 @@ export default function PageState({
     return (
       <>
         <Alert
+          className="page-state-notice"
           type="warning"
           showIcon
           message="部分数据不可用"
-          description={
-            <ul style={{ margin: 0, paddingLeft: 20 }}>
-              {warnings?.map((w, i) => <li key={i}>{w}</li>)}
-            </ul>
-          }
-          style={{ marginBottom: 16 }}
+          description={<ul>{warnings?.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
         />
         {children}
       </>
     );
   }
 
-  // success
   return (
     <>
       {isFallback && (
         <Alert
+          className="page-state-notice"
           type="warning"
           showIcon
           message="回退数据"
-          description="部分数据来自回退源，可能不是最新"
-          style={{ marginBottom: 16 }}
+          description="部分数据来自回退源，可能不是最新状态。"
         />
       )}
       {warnings && warnings.length > 0 && (
         <Alert
+          className="page-state-notice"
           type="info"
           showIcon
-          message={
-            <ul style={{ margin: 0, paddingLeft: 20 }}>
-              {warnings.map((w, i) => <li key={i}>{w}</li>)}
-            </ul>
-          }
-          style={{ marginBottom: 16 }}
+          message={<ul>{warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
         />
       )}
-      <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-        {source && <SourceStamp source={source} isFallback={isFallback} />}
-      </div>
+      {source && <div className="page-state-source"><SourceStamp source={source} isFallback={isFallback} /></div>}
       {children}
     </>
   );

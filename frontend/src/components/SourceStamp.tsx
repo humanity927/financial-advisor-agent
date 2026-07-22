@@ -1,10 +1,10 @@
 import { Tag } from 'antd';
 
 const SOURCE_LABELS: Record<string, string> = {
-  akshare: '实时数据',
+  akshare: 'AKShare 数据',
   tushare: 'Tushare 补充数据',
   cache: '缓存数据',
-  fixture: '演示数据',
+  fixture: '演示数据 / 非实时',
   system: '系统',
   mixed: '多源',
   local: '本地状态',
@@ -32,7 +32,7 @@ export default function SourceStamp({ source, isFallback }: SourceStampProps) {
   return (
     <Tag color={color}>
       {label}
-      {isFallback && ' ⚠'}
+      {isFallback && ' · 回退'}
     </Tag>
   );
 }

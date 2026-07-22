@@ -1,21 +1,3 @@
-.portfolio-page .ant-card {
-  border-radius: var(--radius-lg);
-}
-
-.portfolio-grid {
-  display: grid;
-  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
-  gap: 24px;
-  align-items: start;
-}
-
-.portfolio-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-width: 0;
-}
-
 .portfolio-form-card .ant-form-item {
   margin-bottom: 12px;
 }
@@ -38,9 +20,9 @@
 
 .portfolio-risk-item {
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 12px;
-  background: #FAFBFC;
+  border-radius: var(--radius-sm);
+  padding: 11px 12px;
+  background: var(--color-surface-muted);
 }
 
 .portfolio-risk-item span {
@@ -80,7 +62,7 @@
 
 .portfolio-chart {
   width: 100%;
-  height: 300px;
+  height: 280px;
 }
 
 .portfolio-list {
@@ -98,10 +80,6 @@
 }
 
 @media (max-width: 1024px) {
-  .portfolio-grid {
-    grid-template-columns: 1fr;
-  }
-
   .portfolio-risk-summary {
     grid-template-columns: 1fr;
   }

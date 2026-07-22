@@ -45,6 +45,16 @@ const TOOL_LABELS: Record<string, string> = {
   build_allocation: '配置建议',
 };
 
+const PROFILE_LABELS: Record<string, string> = {
+  amount_cny: '投资金额',
+  horizon_months: '投资期限',
+  max_loss_pct: '最大亏损',
+  income_stability: '收入稳定性',
+  experience: '投资经验',
+  liquidity_need: '流动性需求',
+  emergency_fund_months: '应急资金',
+};
+
 function formatTime(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
@@ -282,7 +292,7 @@ export default function ChatPage() {
         : null;
 
   return (
-    <div className="chat-page">
+    <div className="page-layout chat-page">
       {messageContext}
       <SectionHeader
         title="Agent 咨询"
@@ -332,7 +342,7 @@ export default function ChatPage() {
           <Card size="small" title="已收集画像">
             <div className="chat-profile-grid">
               {Object.entries(workspace.profile).map(([key, value]) => (
-                <span key={key}><small>{key}</small><strong>{String(value)}</strong></span>
+                <span key={key}><small>{PROFILE_LABELS[key] ?? key}</small><strong>{String(value)}</strong></span>
               ))}
               {Object.keys(workspace.profile).length === 0 && <Typography.Text type="secondary">等待从对话提取</Typography.Text>}
             </div>

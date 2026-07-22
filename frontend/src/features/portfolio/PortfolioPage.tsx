@@ -5,7 +5,6 @@ import {
   Button,
   Card,
   Col,
-  Empty,
   Form,
   InputNumber,
   Row,
@@ -27,6 +26,7 @@ import { client, ApiClientError } from '../../api/client';
 import type { PortfolioPlanResult, ProfileInput } from '../../api/types';
 import './PortfolioPage.css';
 import { useWorkspace } from '../../app/WorkspaceContext';
+import WorkspaceLayout from '../../components/WorkspaceLayout';
 
 const ASSETS = [
   { key: '现金', label: '现金', color: '#2B7BD6' },
@@ -265,14 +265,16 @@ export default function PortfolioPage() {
         : '配置规划生成失败，请稍后重试';
 
   return (
-    <div className="portfolio-page">
+    <div className="page-layout portfolio-page">
       <SectionHeader
         title="配置规划"
         subtitle="根据投资者画像生成资产配置比例、金额拆分和目标偏离说明"
       />
 
-      <div className="portfolio-grid">
-        <div className="portfolio-stack">
+      <WorkspaceLayout
+        className="portfolio-grid"
+        sidebar={(
+        <div className="workspace-sidebar-stack">
           <ProfileForm
             onSubmit={handleSubmit}
             initialValues={workspace.profile}
@@ -329,22 +331,18 @@ export default function PortfolioPage() {
             />
           </Card>
         </div>
+        )}
+      >
 
-        <div className="portfolio-stack" data-testid="portfolio-result-panel">
+        <div className="workspace-main-stack" data-testid="portfolio-result-panel">
           {!mutation.isPending && !mutation.isError && !mutation.isSuccess && (
-            <Card>
-              <Empty description="填写左侧画像并确认当前配置后，生成资产配置规划。" />
-            </Card>
+            <PageState state="empty" emptyDescription="填写左侧画像并确认当前配置后，生成资产配置规划。" />
           )}
 
-          {mutation.isPending && (
-            <Card>
-              <PageState state="loading" />
-            </Card>
-          )}
+          {mutation.isPending && <PageState state="loading" />}
 
           {mutation.isError && (
-            <Card>
+            <div className="page-state">
               <Alert
                 type="error"
                 showIcon
@@ -362,7 +360,7 @@ export default function PortfolioPage() {
                   ) : undefined
                 }
               />
-            </Card>
+            </div>
           )}
 
           {mutation.isSuccess && plan && (
@@ -499,7 +497,7 @@ export default function PortfolioPage() {
             </>
           )}
         </div>
-      </div>
+      </WorkspaceLayout>
     </div>
   );
 }

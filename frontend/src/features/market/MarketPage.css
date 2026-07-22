@@ -1,5 +1,5 @@
 .market-control-card .ant-card-body {
-  padding: 20px;
+  padding: 16px;
 }
 
 .market-control-heading {
@@ -7,7 +7,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding-bottom: 18px;
+  padding-bottom: 14px;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -18,8 +18,8 @@
 .market-filter-grid {
   display: grid;
   grid-template-columns: minmax(240px, 0.9fr) minmax(180px, 0.6fr) minmax(420px, 1.5fr);
-  gap: 20px;
-  padding-top: 18px;
+  gap: 16px;
+  padding-top: 14px;
 }
 
 .market-filter-block {
@@ -50,14 +50,14 @@
   padding: 8px 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: #fff;
+  background: var(--color-surface);
   transition: border-color 160ms ease, background-color 160ms ease;
 }
 
 .market-symbol-option:hover,
 .market-symbol-option:has(.ant-checkbox-checked) {
-  border-color: #82aee6;
-  background: #f5f9ff;
+  border-color: #78a6a2;
+  background: var(--color-brand-soft);
 }
 
 .market-symbol-option .ant-checkbox-wrapper {
@@ -123,7 +123,7 @@
   margin: -4px 0 18px;
   border: 1px solid #e1e7ec;
   border-radius: var(--radius-md);
-  background: #f8fafb;
+  background: var(--color-surface-muted);
 }
 
 .market-summary-strip > div {
@@ -146,7 +146,7 @@
 }
 
 .market-chart {
-  min-height: 360px;
+  min-height: 328px;
 }
 
 @media (max-width: 1180px) {

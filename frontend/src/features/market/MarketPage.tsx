@@ -16,6 +16,7 @@ import {
   Space,
   Table,
   Tag,
+  Tooltip,
   Typography,
   message,
 } from 'antd';
@@ -55,7 +56,7 @@ const RANGE_OPTIONS = [
   { label: '近1年', value: '1Y' },
 ];
 const RETURN_WINDOWS: MarketReturnWindow[] = ['20d', '60d', '252d'];
-const CHART_COLORS = ['#2563EB', '#C58A13', '#168A5B', '#A855A0'];
+const CHART_COLORS = ['#2F6F9F', '#B98932', '#16855B', '#C63F4A', '#7A6B9D', '#5F7B83'];
 
 interface MarketTableRow extends MarketSnapshot {
   returns?: MarketIntervalReturn['returns'];
@@ -306,7 +307,7 @@ export default function MarketPage() {
   const hasData = Boolean(comparison?.normalized_series.length);
 
   return (
-    <div className="market-page">
+    <div className="page-layout market-page">
       {messageContext}
       <SectionHeader
         title="行情对比"
@@ -324,7 +325,7 @@ export default function MarketPage() {
         }
       />
 
-      <Row gutter={[24, 24]}>
+      <Row gutter={[16, 16]}>
         <Col span={24}>
           <Card className="market-control-card">
             <div className="market-control-heading">
@@ -402,13 +403,14 @@ export default function MarketPage() {
                     renderItem={(item) => (
                       <List.Item
                         actions={[
-                          <Button
-                            key="add"
-                            type="text"
-                            icon={<Plus size={15} />}
-                            aria-label={`关注 ${item.symbol}`}
-                            onClick={() => void handleAddSymbol(item)}
-                          />,
+                          <Tooltip key="add" title={`关注 ${item.name}`}>
+                            <Button
+                              type="text"
+                              icon={<Plus size={15} />}
+                              aria-label={`关注 ${item.symbol}`}
+                              onClick={() => void handleAddSymbol(item)}
+                            />
+                          </Tooltip>,
                         ]}
                       >
                         <List.Item.Meta
@@ -455,13 +457,15 @@ export default function MarketPage() {
                             <span>{item.symbol} · {item.asset_class}</span>
                           </span>
                         </Checkbox>
-                        <Button
-                          type="text"
-                          danger
-                          icon={<Trash2 size={14} />}
-                          aria-label={`删除 ${item.symbol}`}
-                          onClick={() => void handleRemoveSymbol(item.symbol)}
-                        />
+                        <Tooltip title={`取消关注 ${item.name}`}>
+                          <Button
+                            type="text"
+                            danger
+                            icon={<Trash2 size={14} />}
+                            aria-label={`删除 ${item.symbol}`}
+                            onClick={() => void handleRemoveSymbol(item.symbol)}
+                          />
+                        </Tooltip>
                       </div>
                     ))}
                   </Checkbox.Group>
@@ -570,7 +574,7 @@ export default function MarketPage() {
                   notMerge
                   lazyUpdate
                   className="market-chart"
-                  style={{ height: 360, width: '100%' }}
+                  style={{ height: 328, width: '100%' }}
                   data-testid="market-compare-chart"
                 />
               </Card>

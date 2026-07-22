@@ -17,22 +17,22 @@ export default function ReportView({ content }: ReportViewProps) {
         rehypePlugins={[rehypeSanitize]}
         components={{
           h1: ({ children }) => <Title level={3}>{children}</Title>,
-          h2: ({ children }) => <Title level={4} style={{ marginTop: 20 }}>{children}</Title>,
+          h2: ({ children }) => <Title level={4}>{children}</Title>,
           h3: ({ children }) => <Title level={5}>{children}</Title>,
-          p: ({ children }) => <Paragraph style={{ lineHeight: 1.8 }}>{children}</Paragraph>,
+          p: ({ children }) => <Paragraph>{children}</Paragraph>,
           strong: ({ children }) => <Text strong>{children}</Text>,
           table: ({ children }) => (
-            <div style={{ overflowX: 'auto', marginBottom: 16 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <div className="report-table-wrap">
+              <table className="report-table">
                 {children}
               </table>
             </div>
           ),
           th: ({ children }) => (
-            <th style={{ border: '1px solid #D9E0E5', padding: '8px 12px', background: '#F4F6F7', textAlign: 'left', fontWeight: 600 }}>{children}</th>
+            <th>{children}</th>
           ),
           td: ({ children }) => (
-            <td style={{ border: '1px solid #D9E0E5', padding: '8px 12px' }}>{children}</td>
+            <td>{children}</td>
           ),
         }}
       >

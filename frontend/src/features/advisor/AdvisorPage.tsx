@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
-import { Row, Col, Card, Alert, Tag, Empty, Divider, Button } from 'antd';
-import { ReloadOutlined, RobotOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { Card, Alert, Tag, Divider, Button } from 'antd';
+import { Bot, Clock3, RefreshCw } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import SectionHeader from '../../components/SectionHeader';
 import PageState from '../../components/PageState';
@@ -11,6 +11,7 @@ import { client, ApiClientError } from '../../api/client';
 import type { ProfileInput } from '../../api/types';
 import type { ChatToolCall } from '../../api/types';
 import { useWorkspace } from '../../app/WorkspaceContext';
+import WorkspaceLayout from '../../components/WorkspaceLayout';
 
 const REPORT_TIMEOUT_MS = 130_000;
 
@@ -64,11 +65,11 @@ export default function AdvisorPage() {
       mutation.error.code === 'model_auth_failed');
 
   return (
-    <div>
+    <div className="page-layout report-page">
       <SectionHeader title="正式咨询报告" subtitle="基于完整画像与四类 MCP 工具结果生成可核验报告" />
 
-      <Row gutter={[24, 24]}>
-        <Col xs={24} lg={8}>
+      <WorkspaceLayout
+        sidebar={(
           <ProfileForm
             onSubmit={handleSubmit}
             loading={isLoading}
@@ -78,93 +79,83 @@ export default function AdvisorPage() {
             initialValues={workspace.profile}
             onValuesChange={workspace.patchProfile}
           />
-        </Col>
-
-        <Col xs={24} lg={16}>
+        )}
+      >
           {!mutation.isError && !mutation.isSuccess && !mutation.isPending && (
-            <Card>
-              <Empty description="填写左侧画像表单，点击「生成报告」开始咨询" />
-            </Card>
+            <PageState state="empty" emptyDescription="填写左侧画像表单，点击「生成报告」开始咨询" />
           )}
 
-          {mutation.isPending && (
-            <Card>
-              <PageState state="loading" />
-              <div style={{ textAlign: 'center', marginTop: 8 }}>
-                <Tag icon={<ClockCircleOutlined />} color="processing">正在生成报告并核验工具调用</Tag>
-              </div>
-            </Card>
-          )}
+          {mutation.isPending && <PageState state="loading" />}
 
           {isTimeout && (
-            <Card>
+            <div className="page-state">
               <Alert
                 type="warning"
                 showIcon
                 message="报告生成超时"
-                description="当前请求超过 60 秒未返回，可能是模型响应较慢或网络异常。请稍后重试。"
+                description="当前请求超过 130 秒未返回，可能是模型响应较慢或网络异常。请稍后重试。"
                 action={
-                  <Button size="small" icon={<ReloadOutlined />} onClick={handleRetry}>
+                  <Button size="small" icon={<RefreshCw size={14} />} onClick={handleRetry}>
                     重试
                   </Button>
                 }
               />
-            </Card>
+            </div>
           )}
 
           {isNoModel && (
-            <Card>
+            <div className="page-state">
               <Alert
                 type="info"
                 showIcon
-                icon={<RobotOutlined />}
+                icon={<Bot size={16} />}
                 message="Agent 暂不可用"
                 description="模型 API Key 未配置或服务暂不可用。您仍可使用行情、风险与配置页面进行参考。"
               />
-            </Card>
+            </div>
           )}
 
           {isApiError && !isNoModel && (
-            <Card>
+            <div className="page-state">
               <Alert
                 type="error"
                 showIcon
                 message="报告生成失败"
                 description={mutation.error instanceof ApiClientError ? mutation.error.message : '请求异常，请稍后重试'}
                 action={
-                  <Button size="small" icon={<ReloadOutlined />} onClick={handleRetry}>
+                  <Button size="small" icon={<RefreshCw size={14} />} onClick={handleRetry}>
                     重试
                   </Button>
                 }
               />
-            </Card>
+            </div>
           )}
 
           {mutation.isSuccess && (!mutation.data?.data?.content || mutation.data.data.content.trim().length === 0) && (
-            <Card>
+            <div className="page-state">
               <Alert
                 type="warning"
                 showIcon
                 message="报告内容为空"
                 description="模型返回了空的咨询报告。"
                 action={
-                  <Button size="small" icon={<ReloadOutlined />} onClick={handleRetry}>
+                  <Button size="small" icon={<RefreshCw size={14} />} onClick={handleRetry}>
                     重新生成
                   </Button>
                 }
               />
-            </Card>
+            </div>
           )}
 
           {mutation.isSuccess && mutation.data?.data?.content && mutation.data.data.content.trim().length > 0 && (
             <Card>
-              <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <div className="report-meta-row">
                 <SourceStamp
                   source={mutation.data.data.source || 'system'}
                   isFallback={mutation.data.data.is_fallback}
                 />
                 {mutation.data.data.as_of && (
-                  <Tag icon={<ClockCircleOutlined />}>{mutation.data.data.as_of}</Tag>
+                  <Tag icon={<Clock3 size={13} />}>{mutation.data.data.as_of}</Tag>
                 )}
               </div>
 
@@ -176,7 +167,7 @@ export default function AdvisorPage() {
                 style={{ marginBottom: 16 }}
               />
 
-              <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div className="report-tool-row">
                 {mutation.data.data.tool_calls.map((call) => (
                   <Tag color={call.ok ? 'success' : 'error'} key={`${call.tool}-${call.called_at}`}>
                     {call.tool} · {call.source}
@@ -196,8 +187,7 @@ export default function AdvisorPage() {
               />
             </Card>
           )}
-        </Col>
-      </Row>
+      </WorkspaceLayout>
     </div>
   );
 }

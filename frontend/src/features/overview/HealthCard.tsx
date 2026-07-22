@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Card, Descriptions, Tag, Skeleton } from 'antd';
+import { Card, Descriptions, Tag, Skeleton, Tooltip } from 'antd';
 import { client } from '../../api/client';
 import { queryKeys } from '../../api/keys';
 import type { HealthStatus } from '../../api/types';
@@ -14,7 +14,7 @@ export default function HealthCard() {
 
   if (isLoading) {
     return (
-      <Card title="系统健康">
+      <Card title="系统健康" className="overview-health-card">
         <Skeleton active paragraph={{ rows: 4 }} />
       </Card>
     );
@@ -22,7 +22,7 @@ export default function HealthCard() {
 
   if (isError || !data?.ok) {
     return (
-      <Card title="系统健康">
+      <Card title="系统健康" className="overview-health-card">
         <PageState state="error" error={error instanceof Error ? error.message : '健康检查失败'} onRetry={refetch} />
       </Card>
     );
@@ -30,8 +30,8 @@ export default function HealthCard() {
 
   const h = data.data;
   return (
-    <Card title="系统健康">
-      <Descriptions column={2} size="small">
+    <Card title="系统健康" className="overview-health-card">
+      <Descriptions column={{ xs: 1, sm: 2 }} size="small">
         <Descriptions.Item label="状态">
           <StatusBadge status={h.status === 'healthy' ? 'healthy' : 'warning'} />
         </Descriptions.Item>
@@ -52,8 +52,16 @@ export default function HealthCard() {
         </Descriptions.Item>
         <Descriptions.Item label="真实缓存">{h.cache_writable ? '可写' : '不可写'}</Descriptions.Item>
         <Descriptions.Item label="演示数据">{h.fixture_available ? '可用' : '不可用'}</Descriptions.Item>
-        <Descriptions.Item label="支持标的">{h.supported_symbol_count} 只</Descriptions.Item>
-        <Descriptions.Item label="来源优先级" span={2}>
+        <Descriptions.Item
+          label={(
+            <Tooltip title="经过后端目录校验、可用于行情查询的 A 股指数与 ETF 元数据数量；不代表每项此刻都有可用行情。">
+              <span>已校验标的</span>
+            </Tooltip>
+          )}
+        >
+          <span className="financial-number">{h.supported_symbol_count} 项</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="来源优先级">
           {h.provider_priority.join(' → ')}
         </Descriptions.Item>
       </Descriptions>

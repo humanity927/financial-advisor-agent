@@ -71,6 +71,7 @@ def _watchlist_error(exc: WatchlistError) -> JSONResponse:
 def search_market_catalog(
     q: str = Query(default="", max_length=80),
     refresh: bool = Query(default=True),
+    representative: bool = Query(default=False),
 ) -> dict[str, Any] | JSONResponse:
     catalog = get_symbol_catalog()
     warnings: list[str] = []
@@ -91,7 +92,11 @@ def search_market_catalog(
             )
             warnings.append("AKShare与Tushare标的目录暂不可用，已展示本地已校验目录")
 
-    items = catalog.search(q, limit=50)
+    items = (
+        catalog.representatives()
+        if representative and not q.strip()
+        else catalog.search(q, limit=50)
+    )
     if not items and warnings:
         return JSONResponse(
             status_code=503,
@@ -106,6 +111,11 @@ def search_market_catalog(
             "items": [asdict(item) for item in items],
             "catalog_fetched_at": catalog.fetched_at,
             "query": q.strip(),
+            "selection_note": (
+                "覆盖大盘、核心宽基、中小盘、成长、债券与黄金方向"
+                if representative and not q.strip()
+                else None
+            ),
         },
         source=source,
         as_of=catalog.fetched_at,

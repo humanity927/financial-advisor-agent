@@ -49,7 +49,9 @@ test.describe('Portfolio Page', () => {
 
     const layout = await page.evaluate(() => {
       const viewportWidth = document.documentElement.clientWidth;
-      const stacks = Array.from(document.querySelectorAll('.portfolio-grid > .portfolio-stack'));
+      const stacks = Array.from(document.querySelectorAll(
+        '.portfolio-grid > .profile-workspace-sidebar, .portfolio-grid > .profile-workspace-main',
+      ));
       return {
         hasDocumentOverflow: document.documentElement.scrollWidth > viewportWidth,
         stacksInsideViewport: stacks.every(

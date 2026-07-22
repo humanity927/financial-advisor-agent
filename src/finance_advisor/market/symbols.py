@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -123,6 +124,40 @@ class SymbolCatalog:
                 if needle in item.symbol.lower() or needle in item.name.lower()
             ]
         return values[:limit]
+
+    def representatives(self, *, limit: int = 6) -> list[SymbolInfo]:
+        """Return stable overview roles using only validated catalog metadata."""
+        values = self.all()
+        rules: tuple[Callable[[SymbolInfo], bool], ...] = (
+            lambda item: item.asset_type == "index" and item.name == "上证指数",
+            lambda item: item.asset_type == "index" and "沪深300" in item.name,
+            lambda item: item.asset_type == "index" and "中证500" in item.name,
+            lambda item: item.asset_type == "index" and "创业板" in item.name,
+            lambda item: item.asset_type == "etf" and item.asset_class == "债券",
+            lambda item: item.asset_type == "etf" and item.asset_class == "黄金",
+        )
+        selected: list[SymbolInfo] = []
+        selected_symbols: set[str] = set()
+
+        for rule in rules:
+            match = next(
+                (item for item in values if item.symbol not in selected_symbols and rule(item)),
+                None,
+            )
+            if match is not None:
+                selected.append(match)
+                selected_symbols.add(match.symbol)
+            if len(selected) >= limit:
+                return selected
+
+        for item in values:
+            if item.symbol in selected_symbols:
+                continue
+            selected.append(item)
+            selected_symbols.add(item.symbol)
+            if len(selected) >= limit:
+                break
+        return selected
 
     def register_provider(self, items: list[SymbolInfo], *, source: str) -> None:
         if source not in {"akshare", "tushare"}:

@@ -8,12 +8,12 @@ import SectionHeader from '../components/SectionHeader';
 describe('SourceStamp', () => {
   it('renders fixture label with orange tag', () => {
     render(<SourceStamp source="fixture" />);
-    expect(screen.getByText('演示数据')).toBeInTheDocument();
+    expect(screen.getByText('演示数据 / 非实时')).toBeInTheDocument();
   });
 
   it('renders akshare label', () => {
     render(<SourceStamp source="akshare" />);
-    expect(screen.getByText('实时数据')).toBeInTheDocument();
+    expect(screen.getByText('AKShare 数据')).toBeInTheDocument();
   });
 
   it('renders Tushare supplemental label', () => {

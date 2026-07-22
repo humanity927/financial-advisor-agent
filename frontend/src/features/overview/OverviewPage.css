@@ -1,0 +1,120 @@
+.overview-page > .ant-row {
+  align-items: start;
+}
+
+.overview-health-card .ant-descriptions-view,
+.overview-allocation-card .ant-descriptions-view {
+  font-size: 13px;
+}
+
+.overview-health-card .ant-descriptions-item-label,
+.overview-health-card .ant-descriptions-item-content {
+  padding-bottom: 9px;
+}
+
+.overview-allocation-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 12px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.overview-allocation-grid > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+}
+
+.overview-allocation-grid > div + div {
+  border-left: 1px solid var(--color-border);
+}
+
+.overview-allocation-grid span,
+.overview-allocation-grid small,
+.overview-allocation-total span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.overview-allocation-grid strong,
+.overview-allocation-total strong {
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-allocation-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border: 1px solid var(--color-border);
+  border-top: 0;
+  background: var(--color-surface-muted);
+}
+
+.overview-allocation-constraints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.overview-snapshot-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.overview-snapshot-context > span,
+.overview-as-of {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.overview-as-of {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-snapshot-alert {
+  margin-bottom: 12px;
+}
+
+.overview-snapshot-note {
+  display: block;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .overview-snapshot-context {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .overview-allocation-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .overview-allocation-grid > div + div {
+    border-left: 0;
+  }
+
+  .overview-allocation-grid > div:nth-child(even) {
+    border-left: 1px solid var(--color-border);
+  }
+
+  .overview-allocation-grid > div:nth-child(n + 3) {
+    border-top: 1px solid var(--color-border);
+  }
+}

@@ -11,21 +11,12 @@ interface SectionHeaderProps {
 
 export default function SectionHeader({ title, subtitle, actions }: SectionHeaderProps) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 24,
-      }}
-    >
-      <div>
-        <Title level={4} style={{ margin: 0 }}>{title}</Title>
-        {subtitle && (
-          <span style={{ color: 'var(--color-text-secondary)', fontSize: 13 }}>{subtitle}</span>
-        )}
+    <header className="section-header">
+      <div className="section-header-copy">
+        <Title level={3} className="section-header-title">{title}</Title>
+        {subtitle && <span className="section-header-subtitle">{subtitle}</span>}
       </div>
-      {actions && <div>{actions}</div>}
-    </div>
+      {actions && <div className="section-header-actions">{actions}</div>}
+    </header>
   );
 }
