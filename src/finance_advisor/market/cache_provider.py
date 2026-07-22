@@ -54,16 +54,24 @@ class CacheProvider:
         except (OSError, ValueError, KeyError, TypeError):
             return None
 
-        # Normal runtime cache may only contain data originally fetched from AKShare.
-        if original.source != "akshare" and original.origin_source != "akshare":
+        origin = original.provider or original.origin_source
+        if origin not in {"akshare", "tushare"}:
             return None
 
         stale = age_seconds > max_age_seconds
-        warning = "AKShare暂不可用，使用已过期的真实行情缓存" if stale else "使用真实行情缓存"
+        provider_label = "AKShare" if origin == "akshare" else "Tushare"
+        warning = (
+            f"行情源暂不可用，使用已过期的真实行情缓存（原始来源：{provider_label}）"
+            if stale
+            else f"行情源暂不可用，使用真实行情缓存（原始来源：{provider_label}）"
+        )
         return original.model_copy(
             update={
                 "source": "cache",
-                "origin_source": "akshare",
+                "provider": origin,
+                "origin_source": origin,
+                "cache_status": "stale" if stale else "fresh",
+                "stale": stale,
                 "is_fallback": True,
                 "warning": warning,
                 "cached_at": cached_at.isoformat(timespec="seconds"),

@@ -159,8 +159,12 @@ def test_advisor_report_rejects_missing_tool_calls(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    calls = 0
+
     class NoToolsAdapter(FakeAdapter):
         def generate_report(self, _prompt: str, *, audit_id: str | None = None) -> str:
+            nonlocal calls
+            calls += 1
             return _complete_report()
 
     monkeypatch.setattr(advisor_routes, "get_hermes_adapter", lambda: NoToolsAdapter())
@@ -168,6 +172,33 @@ def test_advisor_report_rejects_missing_tool_calls(
 
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "mcp_tool_calls_incomplete"
+    assert calls == 2
+
+
+def test_advisor_report_does_not_repeat_after_partial_tool_success(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    class PartialAdapter(FakeAdapter):
+        def generate_report(self, _prompt: str, *, audit_id: str | None = None) -> str:
+            nonlocal calls
+            assert audit_id
+            calls += 1
+            record_tool_result(
+                "assess_investor_profile",
+                success_response({"risk_level": "稳健型", "score": 46}),
+                audit_id=audit_id,
+            )
+            return _complete_report()
+
+    monkeypatch.setattr(advisor_routes, "get_hermes_adapter", lambda: PartialAdapter())
+    response = client.post("/api/advisor/report", json=_report_payload())
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "mcp_tool_calls_incomplete"
+    assert calls == 1
 
 
 def test_advisor_report_returns_stable_error_when_hermes_is_missing(

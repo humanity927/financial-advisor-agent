@@ -290,7 +290,7 @@ function AssetPanel() {
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <Card className="risk-control-card" title={<span className="risk-card-title"><Waves size={18} />资产风险参数</span>}>
         <Space wrap className="risk-control-row">
-          <Select aria-label="风险分析标的" mode="multiple" value={symbols} onChange={(values) => { setSymbols(values); workspace.setRiskSymbol(values[0] ?? null); }} options={symbolOptions} maxCount={4} className="risk-symbol-select" />
+          <Select aria-label="风险分析标的" mode="multiple" value={symbols} onChange={(values) => { setSymbols(values); void workspace.setRiskSymbol(values[0] ?? null); }} options={symbolOptions} maxCount={4} className="risk-symbol-select" />
           <InputNumber aria-label="资产风险回看交易日" min={60} max={1260} precision={0} value={lookbackDays} onChange={(value) => value !== null && setLookbackDays(value)} addonAfter="交易日" />
           <Button type="primary" icon={<Calculator size={15} />} onClick={() => mutation.mutate({ symbols, lookback_days: lookbackDays })} loading={mutation.isPending} disabled={symbols.length === 0} data-testid="risk-assets-submit">计算资产风险</Button>
         </Space>

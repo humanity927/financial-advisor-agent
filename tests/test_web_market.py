@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from finance_advisor.market.models import MarketSeries
 from finance_advisor.market.symbols import SymbolInfo
+from finance_advisor.market.watchlist import reset_watchlist_store_for_tests
 from finance_advisor.web import common as web_common
 from finance_advisor.web.app import create_app
 from finance_advisor.web.common import reset_market_service_for_tests
@@ -19,11 +20,14 @@ from finance_advisor.web.routes import market as market_routes
 def client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> TestClient:
     monkeypatch.setenv("FINANCE_FORCE_FIXTURE", "1")
     monkeypatch.setenv("FINANCE_CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.setenv("FINANCE_WATCHLIST_PATH", str(tmp_path / "watchlist.json"))
     reset_market_service_for_tests()
+    reset_watchlist_store_for_tests()
     app = create_app(static_dir=tmp_path / "frontend-dist")
     with TestClient(app) as test_client:
         yield test_client
     reset_market_service_for_tests()
+    reset_watchlist_store_for_tests()
 
 
 def test_market_compare_returns_normalized_fixture_series(client: TestClient) -> None:
@@ -83,6 +87,40 @@ def test_catalog_search_supports_code_name_and_empty_results(client: TestClient)
     assert by_code.json()["data"]["items"][0]["asset_type"] == "index"
     assert empty.status_code == 200
     assert empty.json()["data"]["items"] == []
+
+
+def test_watchlist_persists_add_switch_compare_remove_and_fallback(client: TestClient) -> None:
+    empty = client.get("/api/market/watchlist")
+    assert empty.json()["data"]["items"] == []
+
+    first = client.post("/api/market/watchlist/items", json={"symbol": "510300"})
+    second = client.post("/api/market/watchlist/items", json={"symbol": "000300"})
+    duplicate = client.post("/api/market/watchlist/items", json={"symbol": "510300"})
+    switched = client.post("/api/market/watchlist/current", json={"symbol": "000300"})
+    compared = client.post(
+        "/api/market/watchlist/comparison",
+        json={"symbols": ["510300", "000300"]},
+    )
+    removed = client.delete("/api/market/watchlist/items/000300")
+    restored = client.get("/api/market/watchlist")
+
+    assert first.status_code == second.status_code == 200
+    assert duplicate.status_code == 409
+    assert duplicate.json()["error"]["code"] == "duplicate_symbol"
+    assert switched.json()["data"]["current_symbol"] == "000300"
+    assert compared.json()["data"]["comparison_symbols"] == ["510300", "000300"]
+    assert removed.json()["data"]["current_symbol"] == "510300"
+    assert restored.json()["data"] == removed.json()["data"]
+
+
+def test_watchlist_rejects_unvalidated_and_unwatched_symbols(client: TestClient) -> None:
+    invalid = client.post("/api/market/watchlist/items", json={"symbol": "999999"})
+    current = client.post("/api/market/watchlist/current", json={"symbol": "510300"})
+
+    assert invalid.status_code == 400
+    assert invalid.json()["error"]["code"] == "invalid_symbol"
+    assert current.status_code == 400
+    assert current.json()["error"]["code"] == "symbol_not_watched"
 
 
 def test_market_snapshot_rejects_unsupported_symbol(client: TestClient) -> None:

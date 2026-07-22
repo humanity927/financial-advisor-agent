@@ -2,21 +2,27 @@ _config_version: 33
 
 custom_providers:
   - name: relay
-    base_url: "__RELAY_BASE_URL__"
+    base_url: '__RELAY_BASE_URL__'
     key_env: RELAY_API_KEY
     api_mode: chat_completions
 
+providers:
+  deepseek:
+    api: '__DEEPSEEK_BASE_URL__'
+    key_env: DEEPSEEK_API_KEY
+    transport: chat_completions
+    request_timeout_seconds: __MODEL_REQUEST_TIMEOUT_SECONDS__
+    discover_models: false
+
 model:
   provider: custom:relay
-  default: "__RELAY_MODEL_ID__"
+  default: '__RELAY_MODEL_ID__'
   context_length: 128000
 
 agent:
-  api_max_retries: 0
+  api_max_retries: __MODEL_MAX_RETRIES__
 
-fallback_providers:
-  - provider: deepseek
-    model: deepseek-chat
+__FALLBACK_PROVIDERS_BLOCK__
 
 mcp_servers:
   finance:

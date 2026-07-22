@@ -87,6 +87,7 @@ class SymbolCatalog:
         self.path = (path or catalog_path()).resolve()
         self._items = dict(BUILTIN_SYMBOLS)
         self.fetched_at: str | None = None
+        self.source: str | None = None
         self._load()
 
     def _load(self) -> None:
@@ -94,13 +95,15 @@ class SymbolCatalog:
             return
         try:
             payload = json.loads(self.path.read_text(encoding="utf-8"))
-            if payload.get("source") != "akshare":
+            source = str(payload.get("source") or "")
+            if source not in {"akshare", "tushare"}:
                 return
             loaded = [SymbolInfo(**raw) for raw in payload.get("items", [])]
             for item in loaded:
                 valid = validate_symbol_info(item)
                 self._items[valid.symbol] = valid
             self.fetched_at = str(payload.get("fetched_at") or "") or None
+            self.source = source
         except (OSError, TypeError, ValueError, json.JSONDecodeError):
             return
 
@@ -121,15 +124,18 @@ class SymbolCatalog:
             ]
         return values[:limit]
 
-    def register_akshare(self, items: list[SymbolInfo]) -> None:
+    def register_provider(self, items: list[SymbolInfo], *, source: str) -> None:
+        if source not in {"akshare", "tushare"}:
+            raise ValueError("标的目录来源无效")
         for item in items:
             valid = validate_symbol_info(item)
             self._items[valid.symbol] = valid
         self.fetched_at = now_iso()
+        self.source = source
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(".tmp")
         payload = {
-            "source": "akshare",
+            "source": source,
             "fetched_at": self.fetched_at,
             "items": [asdict(item) for item in self.all()],
         }
@@ -138,6 +144,9 @@ class SymbolCatalog:
             encoding="utf-8",
         )
         temporary.replace(self.path)
+
+    def register_akshare(self, items: list[SymbolInfo]) -> None:
+        self.register_provider(items, source="akshare")
 
 
 _catalog: SymbolCatalog | None = None

@@ -136,6 +136,12 @@
   align-items: end;
 }
 
+.chat-composer-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 24px;
+}
+
 @media (max-width: 1100px) {
   .chat-workspace {
     grid-template-columns: 1fr;

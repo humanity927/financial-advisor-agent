@@ -27,8 +27,12 @@ export interface MarketSourceDetail {
   symbol: string;
   name: string;
   source: MarketSnapshot['source'];
+  provider: MarketSnapshot['provider'];
   origin_source: MarketSnapshot['origin_source'];
   fetched_at: string;
+  latest_trade_date: string | null;
+  cache_status: MarketSnapshot['cache_status'];
+  stale: boolean;
   is_fallback: boolean;
   warning: string | null;
 }

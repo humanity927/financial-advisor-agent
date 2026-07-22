@@ -89,6 +89,11 @@ export default function HistoryPage() {
     });
   };
 
+  const resumeSession = (id: string) => {
+    queryClient.removeQueries({ queryKey: ['sessions', id], exact: true });
+    navigate(`/advisor?session=${id}`);
+  };
+
   const columns: TableColumnsType<SessionSummary> = [
     { title: '咨询主题', dataIndex: 'title', key: 'title', ellipsis: true },
     { title: '更新时间', dataIndex: 'updated_at', key: 'updated_at', width: 180, render: localTime },
@@ -106,7 +111,7 @@ export default function HistoryPage() {
       render: (_, row) => (
         <Space size="small">
           <Button type="text" icon={<Eye size={15} />} aria-label={`查看 ${row.title}`} onClick={() => setDetailId(row.id)} />
-          <Button type="text" icon={<MessageSquare size={15} />} aria-label={`继续 ${row.title}`} onClick={() => navigate(`/advisor?session=${row.id}`)} />
+          <Button type="text" icon={<MessageSquare size={15} />} aria-label={`继续 ${row.title}`} onClick={() => resumeSession(row.id)} />
           <Button type="text" danger icon={<Trash2 size={15} />} aria-label={`删除 ${row.title}`} onClick={() => confirmDelete(row.id)} />
         </Space>
       ),
@@ -143,7 +148,7 @@ export default function HistoryPage() {
         width={720}
         open={Boolean(detailId)}
         onClose={() => setDetailId(null)}
-        extra={detail && <Button type="primary" onClick={() => navigate(`/advisor?session=${detail.id}`)}>继续咨询</Button>}
+        extra={detail && <Button type="primary" onClick={() => resumeSession(detail.id)}>继续咨询</Button>}
       >
         {detailQuery.isLoading && <Typography.Text type="secondary">正在读取...</Typography.Text>}
         {detailQuery.isError && <Alert type="error" showIcon message="会话详情加载失败" />}

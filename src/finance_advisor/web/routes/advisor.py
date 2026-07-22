@@ -9,12 +9,17 @@ from uuid import uuid4
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-from pydantic import Field
+from pydantic import Field, ValidationError
 
 from finance_advisor.agent.hermes_cli_adapter import (
     HermesCliAdapter,
     HermesCliError,
     cancel_run,
+    is_run_active,
+)
+from finance_advisor.agent.model_config import (
+    DEFAULT_HERMES_TOTAL_TIMEOUT_SECONDS,
+    load_model_runtime_config,
 )
 from finance_advisor.agent.tool_audit import (
     ToolAuditEvent,
@@ -57,10 +62,16 @@ def get_hermes_adapter() -> HermesCliAdapter:
     if not executable:
         bundled = PROJECT_ROOT / ".venv" / "Scripts" / "hermes.exe"
         executable = str(bundled) if bundled.is_file() else "hermes"
+    hermes_home = _adapter_home()
+    try:
+        timeout_seconds = load_model_runtime_config(hermes_home / ".env").total_timeout_seconds
+    except ValidationError:
+        timeout_seconds = DEFAULT_HERMES_TOTAL_TIMEOUT_SECONDS
     return HermesCliAdapter(
         project_root=PROJECT_ROOT,
-        hermes_home=_adapter_home(),
+        hermes_home=hermes_home,
         executable=executable,
+        timeout_seconds=timeout_seconds,
     )
 
 
@@ -146,7 +157,7 @@ def _report_metadata(events: list[ToolAuditEvent]) -> tuple[str, str | None, boo
     source = next(iter(sources)) if len(sources) == 1 else "mixed" if sources else "system"
     dates = [event.as_of for event in financial if event.as_of]
     as_of = max(dates) if dates else None
-    is_fallback = any(event.source in {"cache", "fixture"} for event in financial)
+    is_fallback = any(event.is_fallback for event in financial)
     warnings = [
         f"{event.tool} 调用失败（{event.error_code or 'unknown_error'}）"
         for event in events
@@ -181,7 +192,7 @@ def advisor_report(request: AdvisorReportRequest) -> dict[str, object] | JSONRes
         content = adapter.generate_report(prompt, audit_id=audit_id)
         events = read_tool_audit(audit_id)
         missing_tools = missing_required_tools(events)
-        if missing_tools:
+        if missing_tools and not events:
             retry_prompt = (
                 prompt + "\n上一轮未执行任何必要工具，报告因此被拒绝。现在必须先实际调用上述四个"
                 " finance MCP 工具；不要仅复述工具名称或根据输入直接写报告。"
@@ -211,7 +222,9 @@ def advisor_report(request: AdvisorReportRequest) -> dict[str, object] | JSONRes
         )
     except HermesCliError as exc:
         return JSONResponse(
-            status_code=503 if exc.retryable else 400,
+            status_code=(
+                409 if exc.code == "generation_cancelled" else 503 if exc.retryable else 400
+            ),
             content=error_response(exc.code, exc.message, retryable=exc.retryable),
         )
 
@@ -239,5 +252,18 @@ def cancel_advisor_run(request_id: str) -> dict[str, object]:
     cancelled = cancel_run(request_id)
     return success_response(
         {"request_id": request_id, "cancelled": cancelled},
+        request_id=request_id,
+    )
+
+
+@router.get("/runs/{request_id}", response_model=None)
+def advisor_run_status(request_id: str) -> dict[str, object]:
+    events = read_tool_audit(request_id)
+    return success_response(
+        {
+            "request_id": request_id,
+            "active": is_run_active(request_id),
+            "tool_calls": _tool_status(events),
+        },
         request_id=request_id,
     )

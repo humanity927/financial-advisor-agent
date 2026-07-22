@@ -6,13 +6,15 @@ from pathlib import Path
 
 import pandas as pd
 
-from finance_advisor.market.models import MarketBar, MarketSeries
+from finance_advisor.market.models import MarketBar, MarketProviderName, MarketSeries
 from finance_advisor.market.symbols import SymbolInfo
 from finance_advisor.schemas import now_iso
 
 
 class FixtureProvider:
     """Generate deterministic synthetic history from a committed fixture spec."""
+
+    name: MarketProviderName = "fixture"
 
     def __init__(self, fixture_path: Path) -> None:
         self.fixture_path = fixture_path
@@ -48,6 +50,7 @@ class FixtureProvider:
             asset_class=symbol.asset_class,
             bars=bars[-(lookback_days + 1) :],
             source="fixture",
+            provider="fixture",
             fetched_at=now_iso(),
             is_fallback=True,
             warning=f"演示数据/非实时数据，固定数据日期为 {payload['as_of']}",

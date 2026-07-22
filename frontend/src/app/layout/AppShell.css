@@ -67,6 +67,13 @@
     white-space: nowrap;
   }
 
+  .topbar-provider-status {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 11px !important;
+  }
+
   .shell-content {
     padding: 12px;
   }

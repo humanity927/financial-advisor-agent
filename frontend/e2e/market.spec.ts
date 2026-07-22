@@ -29,7 +29,7 @@ test.describe('Market Page', () => {
     await page.getByText('近3月', { exact: true }).click();
     await expect.poll(() => compareRequests.some((item) => item.range === '3M')).toBe(true);
 
-    await page.getByRole('checkbox', { name: /国债ETF/ }).uncheck();
+    await page.getByRole('checkbox', { name: /国债ETF/ }).click();
     await expect
       .poll(() => compareRequests.some((item) => item.symbols.length === 3 && !item.symbols.includes('511010')))
       .toBe(true);

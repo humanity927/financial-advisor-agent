@@ -16,6 +16,11 @@ describe('SourceStamp', () => {
     expect(screen.getByText('实时数据')).toBeInTheDocument();
   });
 
+  it('renders Tushare supplemental label', () => {
+    render(<SourceStamp source="tushare" isFallback />);
+    expect(screen.getByText(/Tushare 补充数据/)).toBeInTheDocument();
+  });
+
   it('shows warning indicator when isFallback', () => {
     render(<SourceStamp source="cache" isFallback />);
     const tag = screen.getByText(/缓存数据/);

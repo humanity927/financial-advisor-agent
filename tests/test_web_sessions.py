@@ -7,14 +7,28 @@ from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
 from finance_advisor.agent.sessions import reset_session_store_for_tests
+from finance_advisor.agent.tool_audit import record_tool_result
 from finance_advisor.schemas import error_response, success_response
 from finance_advisor.web.app import create_app
 from finance_advisor.web.routes import sessions as session_routes
 
 
+class NaturalAdapter:
+    def configuration_error(self) -> None:
+        return None
+
+    def generate_response(self, prompt: str, *, audit_id: str | None = None) -> str:
+        assert audit_id
+        if "本轮只自然追问这一项" in prompt:
+            return "为了继续完成个性化规划，请告诉我这次计划投入多少资金？"
+        return "这是结合当前会话上下文给出的自然回答。"
+
+
 @pytest.fixture()
 def client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> TestClient:
     monkeypatch.setenv("FINANCE_SESSION_DIR", str(tmp_path / "sessions"))
+    monkeypatch.setenv("FINANCE_TOOL_AUDIT_PATH", str(tmp_path / "tool-audit.jsonl"))
+    monkeypatch.setattr(session_routes, "get_hermes_adapter", lambda: NaturalAdapter())
     reset_session_store_for_tests()
     app = create_app(static_dir=tmp_path / "frontend-dist")
     with TestClient(app) as test_client:
@@ -63,7 +77,7 @@ def _fake_report(_request: object) -> dict[str, object]:
     )
 
 
-def test_session_follows_up_one_missing_profile_field_at_a_time(client: TestClient) -> None:
+def test_ordinary_symbol_message_does_not_force_profile_form(client: TestClient) -> None:
     session_id = _create(client)
 
     response = client.post(
@@ -73,12 +87,29 @@ def test_session_follows_up_one_missing_profile_field_at_a_time(client: TestClie
 
     assert response.status_code == 200
     payload = response.json()["data"]
-    assert payload["missing_fields"][0] == "amount_cny"
-    assert payload["message"]["content"] == "这次计划投入多少金额？请用元或万元说明。"
+    assert payload["missing_fields"] == []
+    assert payload["message"]["content"] == "这是结合当前会话上下文给出的自然回答。"
     assert [item["type"] for item in payload["actions"]] == [
         "market.symbol.add",
         "risk.symbol.select",
     ]
+
+
+def test_personalized_request_follows_up_one_missing_field_naturally(
+    client: TestClient,
+) -> None:
+    session_id = _create(client)
+
+    response = client.post(
+        f"/api/sessions/{session_id}/messages",
+        json={"content": "请帮我做一份资产配置建议", "client_request_id": "plan-followup"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["missing_fields"][0] == "amount_cny"
+    assert "计划投入多少资金" in payload["message"]["content"]
+    assert payload["session"]["personalization_active"] is True
 
 
 def test_complete_chat_extracts_profile_invokes_report_and_restores_session(
@@ -89,7 +120,7 @@ def test_complete_chat_extracts_profile_invokes_report_and_restores_session(
     session_id = _create(client)
     content = (
         "我计划投入10万元，投资期限2年，最大可承受亏损15%，收入稳定，"
-        "有基础投资经验，流动性中等，应急资金可覆盖6个月，关注510300。"
+        "有基础投资经验，流动性中等，应急资金可覆盖6个月，关注510300，请给出配置建议。"
     )
 
     response = client.post(
@@ -134,6 +165,155 @@ def test_sensitive_numbers_are_redacted_before_persistence(client: TestClient) -
     stored = client.get(f"/api/sessions/{session_id}").json()["data"]
     assert "110101199001011234" not in stored["messages"][0]["content"]
     assert "[敏感信息已移除]" in stored["messages"][0]["content"]
+
+
+def test_market_question_calls_only_market_tool_and_restores_as_historical(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class MarketAdapter(NaturalAdapter):
+        def generate_response(self, prompt: str, *, audit_id: str | None = None) -> str:
+            assert audit_id
+            assert "本轮必须实际调用 get_market_snapshot" in prompt
+            assert "本轮必须实际调用 analyze_asset_risk" not in prompt
+            record_tool_result(
+                "get_market_snapshot",
+                success_response(
+                    {"snapshots": [{"symbol": "510300", "trade_date": "2026-07-21"}]},
+                    source="tushare",
+                    as_of="2026-07-21",
+                    is_fallback=True,
+                ),
+                audit_id=audit_id,
+            )
+            return "行情结果来自已调用的确定性工具。"
+
+    monkeypatch.setattr(session_routes, "get_hermes_adapter", lambda: MarketAdapter())
+    session_id = _create(client)
+    response = client.post(
+        f"/api/sessions/{session_id}/messages",
+        json={"content": "510300现在价格是多少？", "client_request_id": "market-turn"},
+    )
+
+    assert response.status_code == 200
+    message = response.json()["data"]["message"]
+    assert message["context_status"] == "current"
+    assert [item["tool"] for item in message["tool_calls"]] == ["get_market_snapshot"]
+    assert message["source"] == "tushare"
+    assert message["is_fallback"] is True
+
+    restored = client.get(f"/api/sessions/{session_id}").json()["data"]
+    assert restored["messages"][-1]["context_status"] == "historical"
+
+
+def test_risk_question_calls_only_risk_tool(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class RiskAdapter(NaturalAdapter):
+        def generate_response(self, prompt: str, *, audit_id: str | None = None) -> str:
+            assert audit_id
+            assert "本轮必须实际调用 analyze_asset_risk" in prompt
+            assert "本轮必须实际调用 get_market_snapshot" not in prompt
+            record_tool_result(
+                "analyze_asset_risk",
+                success_response(
+                    {"assets": [{"symbol": "510300", "metrics": {"var_95_pct": -1.2}}]},
+                    source="akshare",
+                    as_of="2026-07-21",
+                ),
+                audit_id=audit_id,
+            )
+            return "风险指标来自已调用的确定性工具。"
+
+    monkeypatch.setattr(session_routes, "get_hermes_adapter", lambda: RiskAdapter())
+    session_id = _create(client)
+    response = client.post(
+        f"/api/sessions/{session_id}/messages",
+        json={"content": "510300的历史风险怎么样？", "client_request_id": "risk-turn"},
+    )
+
+    assert response.status_code == 200
+    assert [item["tool"] for item in response.json()["data"]["message"]["tool_calls"]] == [
+        "analyze_asset_risk"
+    ]
+
+
+def test_missing_tools_retry_once_but_partial_tools_do_not_repeat_request(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class NoToolsAdapter(NaturalAdapter):
+        calls = 0
+
+        def generate_response(self, prompt: str, *, audit_id: str | None = None) -> str:
+            self.calls += 1
+            return "未调用工具。"
+
+    no_tools = NoToolsAdapter()
+    monkeypatch.setattr(session_routes, "get_hermes_adapter", lambda: no_tools)
+    first_session = _create(client)
+    no_tools_response = client.post(
+        f"/api/sessions/{first_session}/messages",
+        json={"content": "510300现在行情如何？", "client_request_id": "missing-tools"},
+    )
+    assert no_tools_response.status_code == 503
+    assert no_tools.calls == 2
+
+    class PartialAdapter(NaturalAdapter):
+        calls = 0
+
+        def generate_response(self, prompt: str, *, audit_id: str | None = None) -> str:
+            assert audit_id
+            self.calls += 1
+            record_tool_result(
+                "get_market_snapshot",
+                success_response(
+                    {"snapshots": [{"symbol": "510300", "trade_date": "2026-07-21"}]},
+                    source="akshare",
+                    as_of="2026-07-21",
+                ),
+                audit_id=audit_id,
+            )
+            return "只完成一个工具。"
+
+    partial = PartialAdapter()
+    monkeypatch.setattr(session_routes, "get_hermes_adapter", lambda: partial)
+    second_session = _create(client)
+    partial_response = client.post(
+        f"/api/sessions/{second_session}/messages",
+        json={"content": "510300现在行情和风险如何？", "client_request_id": "partial-tools"},
+    )
+    assert partial_response.status_code == 503
+    assert partial.calls == 1
+
+
+def test_general_conversation_includes_bounded_prior_context(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prompts: list[str] = []
+
+    class CapturingAdapter(NaturalAdapter):
+        def generate_response(self, prompt: str, *, audit_id: str | None = None) -> str:
+            prompts.append(prompt)
+            return "已结合上下文回答。"
+
+    monkeypatch.setattr(session_routes, "get_hermes_adapter", lambda: CapturingAdapter())
+    session_id = _create(client)
+    client.post(
+        f"/api/sessions/{session_id}/messages",
+        json={"content": "请解释ETF跟踪误差", "client_request_id": "context-first"},
+    )
+    second = client.post(
+        f"/api/sessions/{session_id}/messages",
+        json={"content": "那它为什么会扩大？", "client_request_id": "context-second"},
+    )
+
+    assert second.status_code == 200
+    assert len(prompts) == 2
+    assert "请解释ETF跟踪误差" in prompts[1]
+    assert "已结合上下文回答" in prompts[1]
 
 
 def test_unknown_and_invalid_ui_actions_are_rejected(client: TestClient) -> None:
@@ -229,7 +409,7 @@ def test_regenerate_replaces_last_assistant_message(
     session_id = _create(client)
     content = (
         "投入10万元，投资期限2年，最大可承受亏损15%，收入稳定，"
-        "有基础投资经验，流动性中等，应急资金6个月。"
+        "有基础投资经验，流动性中等，应急资金6个月，请给出配置建议。"
     )
     client.post(
         f"/api/sessions/{session_id}/messages",
@@ -263,7 +443,7 @@ def test_report_failure_is_safe_and_recorded(
         json={
             "content": (
                 "投入10万元，投资期限2年，最大可承受亏损15%，收入稳定，"
-                "有基础投资经验，流动性中等，应急资金6个月。"
+                "有基础投资经验，流动性中等，应急资金6个月，请给出配置建议。"
             ),
             "client_request_id": "failed-generation",
         },

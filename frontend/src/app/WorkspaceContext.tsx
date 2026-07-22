@@ -1,13 +1,25 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import type { ReactNode } from 'react';
-import type { CatalogSymbol, ProfileInput, UiAction } from '../api/types';
+import { ApiClientError, client } from '../api/client';
+import type {
+  CatalogSymbol,
+  ProfileInput,
+  UiAction,
+  WatchlistData,
+} from '../api/types';
 
-const DEFAULT_WATCHLIST: CatalogSymbol[] = [
-  { symbol: '510300', name: '沪深300ETF', asset_class: '股票', market: 'SH', asset_type: 'etf', provider_symbol: null },
-  { symbol: '511010', name: '国债ETF', asset_class: '债券', market: 'SH', asset_type: 'etf', provider_symbol: null },
-  { symbol: '518880', name: '黄金ETF', asset_class: '黄金', market: 'SH', asset_type: 'etf', provider_symbol: null },
-  { symbol: '511880', name: '货币ETF', asset_class: '现金', market: 'SH', asset_type: 'etf', provider_symbol: null },
-];
+export interface WorkspaceMutationResult {
+  ok: boolean;
+  code: string;
+  message: string;
+}
 
 interface WorkspaceValue {
   profile: Partial<ProfileInput>;
@@ -15,52 +27,119 @@ interface WorkspaceValue {
   selectedSymbols: string[];
   riskSymbol: string | null;
   currentAllocationPct: Record<string, number> | null;
+  watchlistLoading: boolean;
+  watchlistError: string | null;
   patchProfile: (patch: Partial<ProfileInput>) => void;
-  addSymbol: (symbol: CatalogSymbol) => boolean;
-  removeSymbol: (symbol: string) => void;
-  setSelectedSymbols: (symbols: string[]) => void;
-  setRiskSymbol: (symbol: string | null) => void;
+  addSymbol: (symbol: CatalogSymbol | string) => Promise<WorkspaceMutationResult>;
+  removeSymbol: (symbol: string) => Promise<WorkspaceMutationResult>;
+  setSelectedSymbols: (symbols: string[]) => Promise<WorkspaceMutationResult>;
+  setRiskSymbol: (symbol: string | null) => Promise<WorkspaceMutationResult>;
   setCurrentAllocationPct: (allocation: Record<string, number> | null) => void;
-  applyActions: (actions: UiAction[]) => string[];
+  applyActions: (actions: UiAction[]) => Promise<string[]>;
+  refreshWatchlist: () => Promise<void>;
 }
 
 const WorkspaceContext = createContext<WorkspaceValue | null>(null);
 
+function mutationError(error: unknown): WorkspaceMutationResult {
+  if (error instanceof ApiClientError) {
+    return { ok: false, code: error.code, message: error.message };
+  }
+  return { ok: false, code: 'watchlist_unavailable', message: '关注列表服务暂不可用' };
+}
+
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Partial<ProfileInput>>({});
-  const [watchedSymbols, setWatchedSymbols] = useState<CatalogSymbol[]>(DEFAULT_WATCHLIST);
-  const [selectedSymbols, updateSelectedSymbols] = useState(DEFAULT_WATCHLIST.map((item) => item.symbol));
-  const [riskSymbol, setRiskSymbol] = useState<string | null>(DEFAULT_WATCHLIST[0].symbol);
-  const [currentAllocationPct, setCurrentAllocationPct] = useState<Record<string, number> | null>(null);
+  const [watchedSymbols, setWatchedSymbols] = useState<CatalogSymbol[]>([]);
+  const [selectedSymbols, updateSelectedSymbols] = useState<string[]>([]);
+  const [riskSymbol, updateRiskSymbol] = useState<string | null>(null);
+  const [currentAllocationPct, setCurrentAllocationPct] =
+    useState<Record<string, number> | null>(null);
+  const [watchlistLoading, setWatchlistLoading] = useState(true);
+  const [watchlistError, setWatchlistError] = useState<string | null>(null);
+
+  const applyWatchlist = useCallback((state: WatchlistData) => {
+    setWatchedSymbols(state.items);
+    updateSelectedSymbols(state.comparison_symbols);
+    updateRiskSymbol(state.current_symbol);
+    setWatchlistError(null);
+  }, []);
+
+  const refreshWatchlist = useCallback(async () => {
+    setWatchlistLoading(true);
+    try {
+      const response = await client.get<WatchlistData>('/market/watchlist');
+      applyWatchlist(response.data);
+    } catch (error) {
+      setWatchlistError(mutationError(error).message);
+    } finally {
+      setWatchlistLoading(false);
+    }
+  }, [applyWatchlist]);
+
+  useEffect(() => {
+    void refreshWatchlist();
+  }, [refreshWatchlist]);
 
   const patchProfile = useCallback((patch: Partial<ProfileInput>) => {
     setProfile((current) => ({ ...current, ...patch }));
   }, []);
 
-  const addSymbol = useCallback((symbol: CatalogSymbol) => {
-    if (watchedSymbols.some((item) => item.symbol === symbol.symbol) || watchedSymbols.length >= 8) {
-      return false;
+  const addSymbol = useCallback(async (symbol: CatalogSymbol | string) => {
+    const code = typeof symbol === 'string' ? symbol : symbol.symbol;
+    try {
+      const response = await client.post<WatchlistData>('/market/watchlist/items', {
+        symbol: code,
+      });
+      applyWatchlist(response.data);
+      const added = response.data.items.find((item) => item.symbol === code);
+      return {
+        ok: true,
+        code: 'added',
+        message: `已关注 ${code}${added ? ` · ${added.name}` : ''}`,
+      };
+    } catch (error) {
+      return mutationError(error);
     }
-    setWatchedSymbols((current) => [...current, symbol]);
-    updateSelectedSymbols((current) => [...current, symbol.symbol]);
-    return true;
-  }, [watchedSymbols]);
+  }, [applyWatchlist]);
 
-  const removeSymbol = useCallback((symbol: string) => {
-    setWatchedSymbols((current) => current.filter((item) => item.symbol !== symbol));
-    updateSelectedSymbols((current) => current.filter((item) => item !== symbol));
-    setRiskSymbol((current) => (current === symbol ? null : current));
-  }, []);
+  const removeSymbol = useCallback(async (symbol: string) => {
+    try {
+      const response = await client.delete<WatchlistData>(`/market/watchlist/items/${symbol}`);
+      applyWatchlist(response.data);
+      return { ok: true, code: 'removed', message: `已取消关注 ${symbol}` };
+    } catch (error) {
+      return mutationError(error);
+    }
+  }, [applyWatchlist]);
 
-  const setSelectedSymbols = useCallback((symbols: string[]) => {
-    setWatchedSymbols((watched) => {
-      const allowed = new Set(watched.map((item) => item.symbol));
-      updateSelectedSymbols(Array.from(new Set(symbols)).filter((symbol) => allowed.has(symbol)).slice(0, 8));
-      return watched;
-    });
-  }, []);
+  const setSelectedSymbols = useCallback(async (symbols: string[]) => {
+    try {
+      const response = await client.post<WatchlistData>('/market/watchlist/comparison', {
+        symbols,
+      });
+      applyWatchlist(response.data);
+      return { ok: true, code: 'comparison_updated', message: '对比标的已更新' };
+    } catch (error) {
+      return mutationError(error);
+    }
+  }, [applyWatchlist]);
 
-  const applyActions = useCallback((actions: UiAction[]) => {
+  const setRiskSymbol = useCallback(async (symbol: string | null) => {
+    if (symbol === null) {
+      updateRiskSymbol(null);
+      return { ok: true, code: 'current_cleared', message: '已清除当前标的' };
+    }
+    try {
+      const response = await client.post<WatchlistData>('/market/watchlist/current', { symbol });
+      applyWatchlist(response.data);
+      return { ok: true, code: 'current_updated', message: `当前标的已切换到 ${symbol}` };
+    } catch (error) {
+      return mutationError(error);
+    }
+  }, [applyWatchlist]);
+
+  const applyActions = useCallback(async (actions: UiAction[]) => {
     const feedback: string[] = [];
     for (const action of actions) {
       switch (action.type) {
@@ -69,34 +148,29 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           feedback.push('已同步投资者画像到配置页');
           break;
         case 'market.symbol.add': {
-          const existing = watchedSymbols.find((item) => item.symbol === action.payload.symbol);
-          if (existing) {
-            feedback.push(`${action.payload.symbol} 已在关注列表`);
-          } else {
-            const fallback: CatalogSymbol = {
-              symbol: action.payload.symbol,
-              name: action.payload.symbol,
-              asset_class: '待核验',
-              market: action.payload.symbol.startsWith('399') ? 'SZ' : 'SH',
-              asset_type: action.payload.symbol.startsWith('0') || action.payload.symbol.startsWith('399') ? 'index' : 'etf',
-              provider_symbol: null,
-            };
-            addSymbol(fallback);
-            feedback.push(`已关注 ${action.payload.symbol}`);
-          }
+          const result = await addSymbol(action.payload.symbol);
+          feedback.push(
+            result.code === 'duplicate_symbol'
+              ? `${action.payload.symbol} 已在关注列表`
+              : result.message,
+          );
           break;
         }
-        case 'market.symbol.remove':
-          removeSymbol(action.payload.symbol);
-          feedback.push(`已取消关注 ${action.payload.symbol}`);
+        case 'market.symbol.remove': {
+          const result = await removeSymbol(action.payload.symbol);
+          feedback.push(result.message);
           break;
-        case 'risk.symbol.select':
-          setRiskSymbol(action.payload.symbol);
-          feedback.push(`风险分析已切换到 ${action.payload.symbol}`);
+        }
+        case 'risk.symbol.select': {
+          const result = await setRiskSymbol(action.payload.symbol);
+          feedback.push(result.message);
           break;
+        }
         case 'portfolio.inputs.patch':
           if (action.payload.profile) patchProfile(action.payload.profile);
-          if (action.payload.current_allocation_pct) setCurrentAllocationPct(action.payload.current_allocation_pct);
+          if (action.payload.current_allocation_pct) {
+            setCurrentAllocationPct(action.payload.current_allocation_pct);
+          }
           feedback.push('已同步配置输入');
           break;
         default:
@@ -104,7 +178,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }
     }
     return Array.from(new Set(feedback));
-  }, [addSymbol, patchProfile, removeSymbol, watchedSymbols]);
+  }, [addSymbol, patchProfile, removeSymbol, setRiskSymbol]);
 
   const value = useMemo<WorkspaceValue>(() => ({
     profile,
@@ -112,6 +186,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     selectedSymbols,
     riskSymbol,
     currentAllocationPct,
+    watchlistLoading,
+    watchlistError,
     patchProfile,
     addSymbol,
     removeSymbol,
@@ -119,17 +195,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setRiskSymbol,
     setCurrentAllocationPct,
     applyActions,
+    refreshWatchlist,
   }), [
     profile,
     watchedSymbols,
     selectedSymbols,
     riskSymbol,
     currentAllocationPct,
+    watchlistLoading,
+    watchlistError,
     patchProfile,
     addSymbol,
     removeSymbol,
     setSelectedSymbols,
+    setRiskSymbol,
     applyActions,
+    refreshWatchlist,
   ]);
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;

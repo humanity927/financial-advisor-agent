@@ -26,6 +26,7 @@ import {
 import { client, ApiClientError } from '../../api/client';
 import type {
   ApiResponse,
+  AdvisorRunStatus,
   ChatMessage,
   ChatSession,
   ChatTurnData,
@@ -59,6 +60,8 @@ function MessageItem({ item }: { item: ChatMessage }) {
         <strong>{isAssistant ? 'Agent' : '你'}</strong>
         <span>{formatTime(item.created_at)}</span>
         {item.status === 'error' && <Tag color="error">失败</Tag>}
+        {item.status === 'cancelled' && <Tag color="warning">已终止</Tag>}
+        {item.context_status === 'historical' && <Tag>历史上下文</Tag>}
       </div>
       <div className="chat-message-body">
         {isAssistant && item.content.includes('## ') ? (
@@ -76,6 +79,7 @@ function MessageItem({ item }: { item: ChatMessage }) {
               color={call.ok ? 'success' : 'error'}
             >
               {TOOL_LABELS[call.tool] ?? call.tool} · {call.source}
+              {call.is_fallback ? ' · 回退' : ''}
             </Tag>
           ))}
         </div>
@@ -83,7 +87,7 @@ function MessageItem({ item }: { item: ChatMessage }) {
       {isAssistant && item.as_of && (
         <div className="chat-source-row">
           <SourceStamp source={item.source} isFallback={item.is_fallback} />
-          <span>数据截至 {item.as_of}</span>
+          <span>{item.context_status === 'historical' ? '历史数据截至' : '数据截至'} {item.as_of}</span>
         </div>
       )}
     </article>
@@ -110,6 +114,14 @@ export default function ChatPage() {
     queryKey: ['sessions', sessionId],
     queryFn: ({ signal }) => client.get<ChatSession>(`/sessions/${sessionId}`, signal),
     enabled: Boolean(sessionId),
+    retry: false,
+  });
+
+  const runStatusQuery = useQuery({
+    queryKey: ['advisor-run', requestId],
+    queryFn: ({ signal }) => client.get<AdvisorRunStatus>(`/advisor/runs/${requestId}`, signal),
+    enabled: Boolean(requestId),
+    refetchInterval: requestId ? 700 : false,
     retry: false,
   });
 
@@ -149,7 +161,9 @@ export default function ChatPage() {
         payload: { current_allocation_pct: restored.current_allocation_pct },
       });
     }
-    if (actions.length > 0) setActionFeedback(workspace.applyActions(actions));
+    if (actions.length > 0) {
+      void workspace.applyActions(actions).then(setActionFeedback);
+    }
   }, [sessionQuery.data, workspace]);
 
   useEffect(() => {
@@ -180,8 +194,7 @@ export default function ChatPage() {
       { ...response, data: turn.session },
     );
     void queryClient.invalidateQueries({ queryKey: ['sessions'], exact: true });
-    const feedback = workspace.applyActions(turn.actions);
-    setActionFeedback(feedback);
+    void workspace.applyActions(turn.actions).then(setActionFeedback);
   }, [queryClient, workspace]);
 
   const sendMutation = useMutation({
@@ -213,9 +226,24 @@ export default function ChatPage() {
   const regenerateMutation = useMutation({
     mutationFn: () => {
       if (!session) throw new Error('会话尚未创建');
-      return client.post<ChatTurnData>(`/sessions/${session.id}/regenerate`);
+      const nextRequestId = crypto.randomUUID();
+      setRequestId(nextRequestId);
+      const controller = new AbortController();
+      abortRef.current = controller;
+      return client.post<ChatTurnData>(
+        `/sessions/${session.id}/regenerate`,
+        { client_request_id: nextRequestId },
+        controller.signal,
+      );
     },
     onSuccess: (response) => applyTurn(response.data, response),
+    onError: () => {
+      if (sessionId) void sessionQuery.refetch();
+    },
+    onSettled: () => {
+      abortRef.current = null;
+      setRequestId(null);
+    },
   });
 
   const handleSend = () => {
@@ -242,6 +270,8 @@ export default function ChatPage() {
     setSearchParams({}, { replace: true });
   };
 
+  const isGenerating = sendMutation.isPending || regenerateMutation.isPending;
+  const activeToolCalls = runStatusQuery.data?.data.tool_calls ?? [];
   const error = sendMutation.error ?? regenerateMutation.error ?? sessionQuery.error;
   const errorMessage = error instanceof ApiClientError
     ? error.message
@@ -256,7 +286,7 @@ export default function ChatPage() {
       {messageContext}
       <SectionHeader
         title="Agent 咨询"
-        subtitle="多轮收集画像，由 Hermes 编排确定性金融工具并解释结果"
+        subtitle="Hermes 结合会话上下文，按需调用确定性金融工具"
         actions={
           <Space wrap>
             <Button icon={<History size={15} />} onClick={() => navigate('/history')}>历史记录</Button>
@@ -274,18 +304,23 @@ export default function ChatPage() {
           ) : !session || session.messages.length === 0 ? (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="开始描述你的投资金额、期限、风险承受能力和关注标的"
+              description="开始一段金融咨询"
             />
           ) : (
             session.messages.map((item) => <MessageItem item={item} key={item.id} />)
           )}
 
-          {sendMutation.isPending && (
+          {isGenerating && (
             <article className="chat-message chat-message-assistant chat-pending">
               <div className="chat-message-meta"><strong>Agent</strong><Tag color="processing">处理中</Tag></div>
               <div className="chat-pending-tools">
-                {Object.values(TOOL_LABELS).map((label) => (
-                  <span key={label}><Clock3 size={14} />{label}</span>
+                {activeToolCalls.length === 0 ? (
+                  <span><Clock3 size={14} />正在理解上下文并选择必要工具</span>
+                ) : activeToolCalls.map((call) => (
+                  <span key={`${call.tool}-${call.called_at}`}>
+                    {call.ok ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+                    {TOOL_LABELS[call.tool] ?? call.tool} · {call.source}
+                  </span>
                 ))}
               </div>
             </article>
@@ -306,7 +341,7 @@ export default function ChatPage() {
             <Space wrap>{workspace.watchedSymbols.map((item) => <Tag key={item.symbol}>{item.symbol} · {item.name}</Tag>)}</Space>
           </Card>
           {actionFeedback.length > 0 && (
-            <Alert type="success" showIcon message="已同步到工作台" description={actionFeedback.join('；')} />
+            <Alert type="info" showIcon message="工作台状态更新" description={actionFeedback.join('；')} />
           )}
         </aside>
       </div>
@@ -317,13 +352,19 @@ export default function ChatPage() {
             type={errorMessage.includes('终止') ? 'warning' : 'error'}
             showIcon
             message={errorMessage}
-            action={session?.messages.some((item) => item.role === 'user') ? (
-              <Button size="small" icon={<RefreshCw size={14} />} loading={regenerateMutation.isPending} onClick={() => regenerateMutation.mutate()}>
-                重新生成
-              </Button>
-            ) : undefined}
           />
         )}
+        <div className="chat-composer-toolbar">
+          <Button
+            size="small"
+            icon={<RefreshCw size={14} />}
+            loading={regenerateMutation.isPending}
+            disabled={isGenerating || !session?.messages.some((item) => item.role === 'user')}
+            onClick={() => regenerateMutation.mutate()}
+          >
+            重新生成
+          </Button>
+        </div>
         <div className="chat-composer-row">
           <Input.TextArea
             value={input}
@@ -337,9 +378,9 @@ export default function ChatPage() {
             autoSize={{ minRows: 2, maxRows: 6 }}
             maxLength={4000}
             placeholder="输入咨询内容"
-            disabled={!session || sendMutation.isPending}
+            disabled={!session || isGenerating}
           />
-          {sendMutation.isPending ? (
+          {isGenerating ? (
             <Button danger icon={<Square size={15} />} onClick={() => void handleStop()}>终止</Button>
           ) : (
             <Button type="primary" icon={<Send size={15} />} onClick={handleSend} disabled={!session || !input.trim()}>发送</Button>

@@ -11,6 +11,7 @@ from finance_advisor.market.fixture_provider import FixtureProvider
 from finance_advisor.market.models import MarketSeries
 from finance_advisor.market.service import MarketService
 from finance_advisor.market.symbols import SymbolInfo
+from finance_advisor.market.tushare_provider import TushareProvider
 
 PROJECT_ROOT = Path(
     os.getenv("FINANCE_PROJECT_ROOT", Path(__file__).resolve().parents[3])
@@ -38,9 +39,10 @@ def get_market_service() -> MarketService:
     global _market_service
     if _market_service is None:
         _market_service = MarketService(
-            AkshareProvider(timeout_seconds=8.0, max_retries=2),
+            AkshareProvider(timeout_seconds=5.0, max_retries=1),
             CacheProvider(get_cache_dir()),
             FixtureProvider(get_fixture_path()),
+            supplemental=TushareProvider(timeout_seconds=8.0, max_retries=1),
         )
     return _market_service
 

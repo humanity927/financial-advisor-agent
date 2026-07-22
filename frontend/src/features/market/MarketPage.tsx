@@ -78,7 +78,16 @@ function formatTimestamp(value: string) {
 }
 
 export default function MarketPage() {
-  const { watchedSymbols, selectedSymbols, setSelectedSymbols, addSymbol, removeSymbol } = useWorkspace();
+  const {
+    watchedSymbols,
+    selectedSymbols,
+    setSelectedSymbols,
+    addSymbol,
+    removeSymbol,
+    watchlistLoading,
+    watchlistError,
+    refreshWatchlist,
+  } = useWorkspace();
   const [range, setRange] = useState<MarketRange>('1Y');
   const [searchText, setSearchText] = useState('');
   const [submittedSearch, setSubmittedSearch] = useState('');
@@ -95,16 +104,36 @@ export default function MarketPage() {
     retry: false,
   });
 
-  const handleAddSymbol = (item: CatalogSymbol) => {
+  const handleAddSymbol = async (item: CatalogSymbol) => {
     if (watchedSymbols.length >= 8) {
       messageApi.warning('关注列表最多保留 8 个标的');
       return;
     }
-    if (!addSymbol(item)) {
+    if (watchedSymbols.some((watched) => watched.symbol === item.symbol)) {
       messageApi.info(`${item.symbol} 已在关注列表`);
       return;
     }
-    messageApi.success(`已关注 ${item.symbol} · ${item.name}`);
+    const result = await addSymbol(item);
+    if (result.code === 'duplicate_symbol') {
+      messageApi.info(`${item.symbol} 已在关注列表`);
+      return;
+    }
+    if (!result.ok) {
+      messageApi.error(result.message);
+      return;
+    }
+    messageApi.success(result.message);
+  };
+
+  const handleRemoveSymbol = async (symbol: string) => {
+    const result = await removeSymbol(symbol);
+    if (result.ok) messageApi.success(result.message);
+    else messageApi.error(result.message);
+  };
+
+  const handleSelection = async (symbols: string[]) => {
+    const result = await setSelectedSymbols(symbols);
+    if (!result.ok) messageApi.error(result.message);
   };
 
   const compareQuery = useQuery({
@@ -308,20 +337,37 @@ export default function MarketPage() {
               <Space wrap>
                 <Button
                   icon={<ListChecks size={14} />}
-                  onClick={() => setSelectedSymbols(watchedSymbols.map((item) => item.symbol))}
+                  onClick={() => void handleSelection(watchedSymbols.map((item) => item.symbol))}
                   disabled={selectedSymbols.length === watchedSymbols.length}
                 >
                   全选
                 </Button>
                 <Button
                   icon={<CircleOff size={14} />}
-                  onClick={() => setSelectedSymbols([])}
+                  onClick={() => void handleSelection([])}
                   disabled={selectedSymbols.length === 0}
                 >
                   清空
                 </Button>
               </Space>
             </div>
+
+            {watchlistLoading && (
+              <Alert type="info" showIcon message="正在恢复关注列表" />
+            )}
+            {watchlistError && (
+              <Alert
+                type="error"
+                showIcon
+                message="关注列表加载失败"
+                description={watchlistError}
+                action={(
+                  <Button size="small" onClick={() => void refreshWatchlist()}>
+                    重试
+                  </Button>
+                )}
+              />
+            )}
 
             <div className="market-filter-grid">
               <div className="market-filter-block market-search-block">
@@ -342,7 +388,7 @@ export default function MarketPage() {
                     type="error"
                     showIcon
                     message="标的搜索失败"
-                    description={catalogQuery.error instanceof Error ? catalogQuery.error.message : 'AKShare 与本地目录均不可用'}
+                    description={catalogQuery.error instanceof Error ? catalogQuery.error.message : 'AKShare、Tushare 与本地目录均不可用'}
                   />
                 )}
                 {catalogQuery.isSuccess && catalogQuery.data.data.items.length === 0 && (
@@ -361,7 +407,7 @@ export default function MarketPage() {
                             type="text"
                             icon={<Plus size={15} />}
                             aria-label={`关注 ${item.symbol}`}
-                            onClick={() => handleAddSymbol(item)}
+                            onClick={() => void handleAddSymbol(item)}
                           />,
                         ]}
                       >
@@ -399,7 +445,7 @@ export default function MarketPage() {
                   <Checkbox.Group
                     className="market-symbol-grid"
                     value={selectedSymbols}
-                    onChange={(values) => setSelectedSymbols(values.map(String))}
+                    onChange={(values) => void handleSelection(values.map(String))}
                   >
                     {watchedSymbols.map((item) => (
                       <div className="market-symbol-option" key={item.symbol}>
@@ -414,7 +460,7 @@ export default function MarketPage() {
                           danger
                           icon={<Trash2 size={14} />}
                           aria-label={`删除 ${item.symbol}`}
-                          onClick={() => removeSymbol(item.symbol)}
+                          onClick={() => void handleRemoveSymbol(item.symbol)}
                         />
                       </div>
                     ))}

@@ -50,8 +50,12 @@ def _source_details(series_list: list[MarketSeries]) -> list[dict[str, Any]]:
             "symbol": series.symbol,
             "name": series.name,
             "source": series.source,
+            "provider": series.provider,
             "origin_source": series.origin_source,
             "fetched_at": series.fetched_at,
+            "latest_trade_date": series.latest_trade_date,
+            "cache_status": series.cache_status,
+            "stale": series.stale,
             "is_fallback": series.is_fallback,
             "warning": series.warning,
         }

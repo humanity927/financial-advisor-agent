@@ -19,6 +19,12 @@ from finance_advisor.agent.actions import (
     extract_profile_patch,
     extract_symbols,
 )
+from finance_advisor.agent.conversation import (
+    ConversationPlan,
+    build_conversation_prompt,
+    plan_conversation_turn,
+)
+from finance_advisor.agent.hermes_cli_adapter import HermesCliError
 from finance_advisor.agent.sessions import (
     ChatMessage,
     ChatSession,
@@ -26,25 +32,20 @@ from finance_advisor.agent.sessions import (
     get_session_store,
     sanitize_message,
 )
+from finance_advisor.agent.tool_audit import ToolAuditEvent, read_tool_audit
 from finance_advisor.market.symbols import (
     SymbolValidationError,
     get_symbol_catalog,
     normalize_symbol,
 )
 from finance_advisor.schemas import error_response, success_response
-from finance_advisor.web.routes.advisor import AdvisorReportRequest, advisor_report
+from finance_advisor.web.routes.advisor import (
+    AdvisorReportRequest,
+    advisor_report,
+    get_hermes_adapter,
+)
 
 router = APIRouter()
-
-FIELD_QUESTIONS = {
-    "amount_cny": "这次计划投入多少金额？请用元或万元说明。",
-    "horizon_months": "计划投资或持有多长时间？请用月或年说明。",
-    "max_loss_pct": "最多可以承受本金亏损百分之多少？",
-    "income_stability": "目前收入稳定性如何：不稳定、稳定还是非常稳定？",
-    "experience": "投资经验属于无经验、基础、定期投资还是专业？",
-    "liquidity_need": "这笔资金的流动性需求是高、中等还是低？",
-    "emergency_fund_months": "现有应急资金可以覆盖几个月日常支出？",
-}
 
 
 class CreateSessionRequest(BaseModel):
@@ -57,6 +58,14 @@ class ChatTurnRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     content: str = Field(min_length=1, max_length=4_000)
+    client_request_id: str = Field(
+        default_factory=lambda: str(uuid4()), min_length=8, max_length=100
+    )
+
+
+class RegenerateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     client_request_id: str = Field(
         default_factory=lambda: str(uuid4()), min_length=8, max_length=100
     )
@@ -119,6 +128,102 @@ def _decode_report(response: dict[str, object] | JSONResponse) -> tuple[int, dic
     return 200, response
 
 
+def _event_metadata(
+    events: list[ToolAuditEvent],
+) -> tuple[str, str | None, bool]:
+    financial = [
+        event for event in events if event.tool in {"get_market_snapshot", "analyze_asset_risk"}
+    ]
+    sources = {event.source for event in financial if event.source}
+    source = next(iter(sources)) if len(sources) == 1 else "mixed" if sources else "system"
+    dates = [event.as_of for event in financial if event.as_of]
+    return source, max(dates) if dates else None, any(event.is_fallback for event in financial)
+
+
+def _stored_tool_calls(events: list[ToolAuditEvent]) -> list[StoredToolCall]:
+    return [
+        StoredToolCall.model_validate(event.model_dump(exclude={"audit_id"})) for event in events
+    ]
+
+
+def _missing_tools(plan: ConversationPlan, events: list[ToolAuditEvent]) -> list[str]:
+    called = {event.tool for event in events}
+    return [tool for tool in plan.required_tools if tool not in called]
+
+
+def _natural_agent_message(
+    session: ChatSession,
+    request: ChatTurnRequest,
+    cleaned: str,
+    plan: ConversationPlan,
+    actions: list[UiAction],
+) -> ChatMessage:
+    adapter = get_hermes_adapter()
+    configuration_error = adapter.configuration_error()
+    if configuration_error is not None:
+        raise configuration_error
+
+    prompt = build_conversation_prompt(
+        messages=session.messages,
+        latest_content=cleaned,
+        plan=plan,
+        profile=session.profile,
+        audit_id=request.client_request_id,
+    )
+    content = adapter.generate_response(prompt, audit_id=request.client_request_id)
+    events = read_tool_audit(request.client_request_id)
+    missing_tools = _missing_tools(plan, events)
+    if missing_tools and not events:
+        retry_prompt = (
+            prompt + "\n上一轮没有实际调用本轮必需工具，响应已被拒绝。"
+            "现在先调用指定工具，收到结果后再回答；最多执行这一次纠正。"
+        )
+        content = adapter.generate_response(retry_prompt, audit_id=request.client_request_id)
+        events = read_tool_audit(request.client_request_id)
+        missing_tools = _missing_tools(plan, events)
+    if missing_tools:
+        raise HermesCliError(
+            "mcp_tool_calls_incomplete",
+            f"Agent 未完成必要金融工具调用：{'、'.join(missing_tools)}",
+            retryable=True,
+        )
+
+    source, as_of, is_fallback = _event_metadata(events)
+    return ChatMessage(
+        role="assistant",
+        content=content,
+        source=source,
+        as_of=as_of,
+        is_fallback=is_fallback,
+        tool_calls=_stored_tool_calls(events),
+        actions=actions,
+    )
+
+
+def _agent_error_response(
+    session: ChatSession,
+    *,
+    actions: list[UiAction],
+    code: str,
+    message: str,
+    retryable: bool,
+    status_code: int,
+) -> JSONResponse:
+    session.messages.append(
+        ChatMessage(
+            role="assistant",
+            content=message,
+            status="cancelled" if code == "generation_cancelled" else "error",
+            actions=actions,
+        )
+    )
+    get_session_store().save(session)
+    return JSONResponse(
+        status_code=status_code,
+        content=error_response(code, message, retryable=retryable),
+    )
+
+
 def _run_turn(
     session: ChatSession,
     request: ChatTurnRequest,
@@ -145,7 +250,8 @@ def _run_turn(
         _apply_action(session, profile_action)
         actions.append(profile_action)
 
-    for symbol in extract_symbols(cleaned, get_symbol_catalog()):
+    mentioned_symbols = extract_symbols(cleaned, get_symbol_catalog())
+    for symbol in mentioned_symbols:
         symbol_action = MarketSymbolAddAction(
             type="market.symbol.add",
             payload=SymbolActionPayload(symbol=symbol),
@@ -160,16 +266,49 @@ def _run_turn(
         _apply_action(session, risk_action)
         actions.append(risk_action)
 
-    missing = session.profile.missing_fields()
-    if missing:
-        message = ChatMessage(
-            role="assistant",
-            content=FIELD_QUESTIONS[missing[0]],
-            actions=actions,
-        )
+    plan = plan_conversation_turn(
+        cleaned,
+        profile=session.profile,
+        mentioned_symbols=mentioned_symbols,
+        contextual_symbols=(
+            [session.risk_symbol] if session.risk_symbol is not None else session.symbols
+        ),
+        personalization_active=session.personalization_active,
+    )
+    session.personalization_active = plan.kind in {"personalized_followup", "formal_report"}
+    if plan.kind != "formal_report":
+        try:
+            message = _natural_agent_message(session, request, cleaned, plan, actions)
+        except OSError:
+            return _agent_error_response(
+                session,
+                actions=actions,
+                code="model_unavailable",
+                message="Hermes CLI 未安装或无法启动，请先完成本地运行环境配置。",
+                retryable=True,
+                status_code=503,
+            )
+        except HermesCliError as exc:
+            status_code = (
+                409 if exc.code == "generation_cancelled" else 503 if exc.retryable else 400
+            )
+            return _agent_error_response(
+                session,
+                actions=actions,
+                code=exc.code,
+                message=exc.message,
+                retryable=exc.retryable,
+                status_code=status_code,
+            )
         session.messages.append(message)
         store.save(session)
-        return success_response(_response_payload(session, message, missing))
+        return success_response(
+            _response_payload(session, message, plan.missing_fields),
+            source=message.source,
+            as_of=message.as_of,
+            is_fallback=message.is_fallback,
+            request_id=request.client_request_id,
+        )
 
     report_request = AdvisorReportRequest.model_validate(
         {
@@ -183,15 +322,15 @@ def _run_turn(
     if status >= 400 or not report.get("ok"):
         raw_error = report.get("error")
         error = raw_error if isinstance(raw_error, dict) else {}
-        message = ChatMessage(
-            role="assistant",
-            content=str(error.get("message") or "Agent 咨询暂不可用，请稍后重试。"),
-            status="error",
+        code = str(error.get("code") or "advisor_unavailable")
+        return _agent_error_response(
+            session,
             actions=actions,
+            code=code,
+            message=str(error.get("message") or "Agent 咨询暂不可用，请稍后重试。"),
+            retryable=bool(error.get("retryable")),
+            status_code=status,
         )
-        session.messages.append(message)
-        store.save(session)
-        return JSONResponse(status_code=status, content=report)
 
     data = report.get("data")
     report_data = data if isinstance(data, dict) else {}
@@ -206,6 +345,7 @@ def _run_turn(
         tool_calls=[StoredToolCall.model_validate(item) for item in calls],
         actions=actions,
     )
+    session.personalization_active = False
     session.messages.append(message)
     store.save(session)
     return success_response(
@@ -259,7 +399,10 @@ def send_message(session_id: str, request: ChatTurnRequest) -> dict[str, object]
 
 
 @router.post("/{session_id}/regenerate", response_model=None)
-def regenerate_message(session_id: str) -> dict[str, object] | JSONResponse:
+def regenerate_message(
+    session_id: str,
+    request: Annotated[RegenerateRequest | None, Body()] = None,
+) -> dict[str, object] | JSONResponse:
     session = get_session_store().get(session_id)
     if session is None:
         return _not_found()
@@ -271,8 +414,11 @@ def regenerate_message(session_id: str) -> dict[str, object] | JSONResponse:
         )
     if session.messages and session.messages[-1].role == "assistant":
         session.messages.pop()
-    request = ChatTurnRequest(content=user_message.content)
-    return _run_turn(session, request, append_user=False)
+    turn_request = ChatTurnRequest(
+        content=user_message.content,
+        client_request_id=(request.client_request_id if request is not None else str(uuid4())),
+    )
+    return _run_turn(session, turn_request, append_user=False)
 
 
 @router.post("/{session_id}/actions", response_model=None)

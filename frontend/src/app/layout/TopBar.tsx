@@ -3,7 +3,6 @@ import { Tag, Spin } from 'antd';
 import { Clock, Wifi, Database } from 'lucide-react';
 import { client } from '../../api/client';
 import { queryKeys } from '../../api/keys';
-import SourceStamp from '../../components/SourceStamp';
 import type { HealthStatus } from '../../api/types';
 
 export default function TopBar() {
@@ -42,12 +41,14 @@ export default function TopBar() {
           >
             {data.data.force_fixture ? '演示模式' : '实时优先'}
           </Tag>
-          <SourceStamp
-            source={data.data.force_fixture ? 'fixture' : 'system'}
-          />
-          <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
+          <span
+            className="topbar-provider-status"
+            style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}
+          >
             <Wifi size={13} style={{ verticalAlign: 'text-bottom', marginRight: 4 }} />
-            AKShare {data.data.akshare_installed ? '已就绪' : '未安装'}
+            AKShare {data.data.akshare_installed ? '就绪' : '未安装'}
+            {' · '}
+            Tushare {data.data.tushare_configured ? '就绪' : '未配置'}
           </span>
         </>
       ) : (

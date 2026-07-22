@@ -127,6 +127,10 @@ def create_app(static_dir: Path | None = None) -> FastAPI:
                 "status": "healthy",
                 "service": "finance-advisor-web",
                 "akshare_installed": service.live.available(),
+                "tushare_configured": bool(
+                    service.supplemental and service.supplemental.available()
+                ),
+                "provider_priority": ["akshare", "tushare", "cache"],
                 "cache_directory": str(cache_dir),
                 "cache_writable": os.access(cache_dir, os.W_OK),
                 "fixture_path": str(fixture_path),

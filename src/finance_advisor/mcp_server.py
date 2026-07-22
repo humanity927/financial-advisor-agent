@@ -22,6 +22,7 @@ from finance_advisor.market.symbols import (
     get_symbol_catalog,
     normalize_symbols,
 )
+from finance_advisor.market.tushare_provider import TushareProvider
 from finance_advisor.risk.portfolio import PortfolioValidationError
 from finance_advisor.risk.service import (
     InvalidLookbackError,
@@ -66,9 +67,10 @@ def get_market_service() -> MarketService:
     global _market_service
     if _market_service is None:
         _market_service = MarketService(
-            AkshareProvider(timeout_seconds=8.0, max_retries=2),
+            AkshareProvider(timeout_seconds=5.0, max_retries=1),
             CacheProvider(CACHE_DIR),
             FixtureProvider(FIXTURE_PATH),
+            supplemental=TushareProvider(timeout_seconds=8.0, max_retries=1),
         )
     return _market_service
 
@@ -118,7 +120,7 @@ def _profile_or_error(**values: Any) -> InvestorProfileInput | dict[str, Any]:
 @mcp.tool()
 @audit_tool("finance_health")
 def finance_health() -> dict[str, Any]:
-    """检查金融MCP、AKShare、缓存目录和离线演示数据是否可用，不请求实时行情。"""
+    """检查金融MCP、AKShare、Tushare、缓存目录和演示数据，不请求实时行情。"""
     request_id = str(uuid4())
     try:
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -126,6 +128,8 @@ def finance_health() -> dict[str, Any]:
         data = {
             "status": "healthy",
             "akshare_installed": service.live.available(),
+            "tushare_configured": bool(service.supplemental and service.supplemental.available()),
+            "provider_priority": ["akshare", "tushare", "cache"],
             "cache_directory": str(CACHE_DIR),
             "cache_writable": os.access(CACHE_DIR, os.W_OK),
             "fixture_path": str(FIXTURE_PATH),
@@ -149,7 +153,7 @@ def get_market_snapshot(
     symbols: list[str],
     audit_id: Annotated[str | None, Field(min_length=8, max_length=100)] = None,
 ) -> dict[str, Any]:
-    """查询1到8个已校验A股指数或ETF；正常模式只返回AKShare或真实行情缓存。"""
+    """查询1到8个已校验A股指数或ETF；正常模式按AKShare、Tushare、真实缓存降级。"""
     request_id = str(uuid4())
     try:
         normalized = normalize_symbols(symbols)
@@ -170,7 +174,7 @@ def get_market_snapshot(
         LOGGER.exception("get_market_snapshot failed request_id=%s", request_id)
         return error_response(
             "market_data_unavailable",
-            "行情查询失败，AKShare与真实行情缓存均不可用",
+            "行情查询失败，AKShare、Tushare与真实行情缓存均不可用",
             retryable=True,
             request_id=request_id,
         )

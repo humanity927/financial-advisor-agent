@@ -30,6 +30,7 @@ class ToolAuditEvent(BaseModel):
     ok: bool
     source: str = "system"
     as_of: str | None = None
+    is_fallback: bool = False
     error_code: str | None = None
     summary: dict[str, Any] = Field(default_factory=dict)
 
@@ -94,6 +95,7 @@ def record_tool_result(
         ok=bool(result.get("ok")),
         source=str(meta.get("source") or "system"),
         as_of=str(meta.get("as_of")) if meta.get("as_of") else None,
+        is_fallback=bool(meta.get("is_fallback")),
         error_code=str(error.get("code")) if error.get("code") else None,
         summary=_summary(tool, result),
     )

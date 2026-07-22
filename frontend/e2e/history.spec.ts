@@ -17,6 +17,8 @@ test('creates, views, resumes, and deletes a consultation session', async ({ pag
   await detail.getByRole('button', { name: '继续咨询' }).click();
   await expect(page).toHaveURL(/\/advisor\?session=/);
   await expect(page.getByText('历史记录测试', { exact: false }).first()).toBeVisible();
+  await expect(page.getByText('历史上下文')).toBeVisible();
+  await expect(page.getByText('历史数据截至 2026-07-17')).toBeVisible();
 
   await page.goto('/history');
   const restoredRow = page.getByRole('row').filter({ hasText: '历史记录测试' }).first();

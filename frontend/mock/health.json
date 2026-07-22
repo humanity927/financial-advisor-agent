@@ -3,6 +3,8 @@
   "data": {
     "status": "healthy",
     "akshare_installed": true,
+    "tushare_configured": true,
+    "provider_priority": ["akshare", "tushare", "cache"],
     "cache_directory": ".runtime/cache",
     "cache_writable": true,
     "fixture_path": "data/fixtures/market_data.json",

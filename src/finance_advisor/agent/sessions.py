@@ -27,6 +27,7 @@ class StoredToolCall(BaseModel):
     ok: bool
     source: str
     as_of: str | None = None
+    is_fallback: bool = False
     error_code: str | None = None
     summary: dict[str, object] = Field(default_factory=dict)
 
@@ -39,6 +40,7 @@ class ChatMessage(BaseModel):
     content: str = Field(min_length=1, max_length=50_000)
     created_at: str = Field(default_factory=now_iso)
     status: Literal["complete", "error", "cancelled"] = "complete"
+    context_status: Literal["current", "historical"] = "current"
     source: str = "system"
     as_of: str | None = None
     is_fallback: bool = False
@@ -57,6 +59,7 @@ class ChatSession(BaseModel):
     symbols: list[str] = Field(default_factory=list, max_length=8)
     risk_symbol: str | None = None
     current_allocation_pct: dict[str, float] | None = None
+    personalization_active: bool = False
     messages: list[ChatMessage] = Field(default_factory=list)
 
     @field_serializer("profile")
@@ -114,7 +117,14 @@ class SessionStore:
             if not path.is_file():
                 return None
             try:
-                return ChatSession.model_validate_json(path.read_text(encoding="utf-8"))
+                session = ChatSession.model_validate_json(path.read_text(encoding="utf-8"))
+                for message in session.messages:
+                    if message.role == "assistant" and any(
+                        call.tool in {"get_market_snapshot", "analyze_asset_risk"}
+                        for call in message.tool_calls
+                    ):
+                        message.context_status = "historical"
+                return session
             except (OSError, ValueError):
                 return None
 

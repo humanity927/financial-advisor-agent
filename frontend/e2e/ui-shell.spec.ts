@@ -44,7 +44,8 @@ test.describe('App Shell', () => {
 
     const topbar = page.getByTestId('system-topbar');
     await expect(topbar).toBeVisible();
-    await expect(topbar.locator('.ant-tag')).toHaveCount(2);
+    await expect(topbar.getByText('演示模式')).toBeVisible();
+    await expect(topbar.getByText(/AKShare 就绪 · Tushare 就绪/)).toBeVisible();
   });
 
   test('keeps the mobile navigation trigger inside the viewport', async ({ page }) => {

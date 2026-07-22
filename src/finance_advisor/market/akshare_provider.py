@@ -10,18 +10,22 @@ from typing import Any, cast
 
 import pandas as pd
 
-from finance_advisor.market.models import MarketBar, MarketSeries
+from finance_advisor.market.models import MarketBar, MarketProviderName, MarketSeries
+from finance_advisor.market.provider import (
+    MarketProviderError,
+    ProviderErrorCode,
+    classify_provider_exception,
+    retryable_error,
+)
 from finance_advisor.market.symbols import SymbolInfo
 from finance_advisor.schemas import now_iso
 
 LOGGER = logging.getLogger(__name__)
 
 
-class MarketProviderError(RuntimeError):
-    """A sanitized error raised when AKShare cannot return usable data."""
-
-
 class AkshareProvider:
+    name: MarketProviderName = "akshare"
+
     def __init__(
         self,
         *,
@@ -54,7 +58,12 @@ class AkshareProvider:
         try:
             import akshare as ak
         except ImportError as exc:
-            raise MarketProviderError("AKShare未安装") from exc
+            raise MarketProviderError(
+                "akshare",
+                ProviderErrorCode.CONFIGURATION_MISSING,
+                "AKShare未安装",
+                retryable=False,
+            ) from exc
         if asset_type == "index":
             return cast(Callable[..., pd.DataFrame], ak.stock_zh_index_daily_em)
         return cast(Callable[..., pd.DataFrame], ak.fund_etf_hist_em)
@@ -65,7 +74,12 @@ class AkshareProvider:
         try:
             import akshare as ak
         except ImportError as exc:
-            raise MarketProviderError("AKShare未安装") from exc
+            raise MarketProviderError(
+                "akshare",
+                ProviderErrorCode.CONFIGURATION_MISSING,
+                "AKShare未安装",
+                retryable=False,
+            ) from exc
         return cast(Callable[..., pd.DataFrame], ak.fund_etf_spot_em)
 
     def _fetch_once(
@@ -79,7 +93,12 @@ class AkshareProvider:
             return future.result(timeout=self.timeout_seconds)
         except FutureTimeoutError as exc:
             future.cancel()
-            raise MarketProviderError(f"AKShare请求超过{self.timeout_seconds:g}秒") from exc
+            raise MarketProviderError(
+                "akshare",
+                ProviderErrorCode.TIMEOUT,
+                f"AKShare请求超过{self.timeout_seconds:g}秒",
+                retryable=True,
+            ) from exc
         finally:
             executor.shutdown(wait=False, cancel_futures=True)
 
@@ -90,20 +109,31 @@ class AkshareProvider:
         **kwargs: Any,
     ) -> pd.DataFrame:
         last_error: Exception | None = None
+        last_code = ProviderErrorCode.INVALID_RESPONSE
         for attempt in range(self.max_retries + 1):
             try:
                 return self._fetch_once(fetcher, **kwargs)
             except Exception as exc:
                 last_error = exc
+                last_code = (
+                    exc.code
+                    if isinstance(exc, MarketProviderError)
+                    else classify_provider_exception(exc)
+                )
                 LOGGER.warning(
                     "AKShare attempt %s failed for %s error_type=%s",
                     attempt + 1,
                     label,
                     type(exc).__name__,
                 )
-                if attempt < self.max_retries:
+                if attempt < self.max_retries and retryable_error(last_code):
                     time.sleep(0.5 * (attempt + 1))
-        raise MarketProviderError("AKShare行情请求失败") from last_error
+        raise MarketProviderError(
+            "akshare",
+            last_code,
+            "AKShare行情请求失败",
+            retryable=retryable_error(last_code),
+        ) from last_error
 
     @staticmethod
     def _history_columns(frame: pd.DataFrame) -> tuple[str, str]:
@@ -116,7 +146,12 @@ class AkshareProvider:
             "",
         )
         if not date_column or not close_column:
-            raise MarketProviderError("AKShare返回字段不完整")
+            raise MarketProviderError(
+                "akshare",
+                ProviderErrorCode.INVALID_RESPONSE,
+                "AKShare返回字段不完整",
+                retryable=True,
+            )
         return date_column, close_column
 
     def fetch_history(self, symbol: SymbolInfo, lookback_days: int) -> MarketSeries:
@@ -147,7 +182,12 @@ class AkshareProvider:
             **kwargs,
         )
         if frame.empty:
-            raise MarketProviderError("AKShare返回空数据")
+            raise MarketProviderError(
+                "akshare",
+                ProviderErrorCode.EMPTY_DATA,
+                "AKShare返回空数据",
+                retryable=True,
+            )
         date_column, close_column = self._history_columns(frame)
 
         normalized = frame.loc[:, [date_column, close_column]].copy()
@@ -158,7 +198,12 @@ class AkshareProvider:
         normalized = normalized.loc[normalized["close"] > 0].sort_values("date")
         normalized = normalized.tail(lookback_days + 1)
         if normalized.empty:
-            raise MarketProviderError("AKShare没有返回有效收盘价")
+            raise MarketProviderError(
+                "akshare",
+                ProviderErrorCode.INVALID_RESPONSE,
+                "AKShare没有返回有效收盘价",
+                retryable=True,
+            )
 
         bars = [
             MarketBar(date=row["date"].date(), close=float(row["close"]))
@@ -170,6 +215,7 @@ class AkshareProvider:
             asset_class=symbol.asset_class,
             bars=bars,
             source="akshare",
+            provider="akshare",
             fetched_at=now_iso(),
         )
 
@@ -186,7 +232,12 @@ class AkshareProvider:
     def search_etfs(self, query: str, *, limit: int = 50) -> list[SymbolInfo]:
         frame = self._fetch_with_retries("ETF目录", self._resolve_catalog_fetcher())
         if frame.empty or "代码" not in frame.columns or "名称" not in frame.columns:
-            raise MarketProviderError("AKShare ETF目录为空或字段不完整")
+            raise MarketProviderError(
+                "akshare",
+                ProviderErrorCode.INVALID_RESPONSE,
+                "AKShare ETF目录为空或字段不完整",
+                retryable=True,
+            )
         needle = query.strip().lower()
         results: list[SymbolInfo] = []
         for _, row in frame.loc[:, ["代码", "名称"]].iterrows():

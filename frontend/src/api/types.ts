@@ -1,7 +1,7 @@
 /** 冻结契约 — 与第 6 节 API 结构对齐 */
 
 export interface ApiMeta {
-  source: 'akshare' | 'cache' | 'fixture' | 'system' | 'mixed';
+  source: 'akshare' | 'tushare' | 'cache' | 'fixture' | 'system' | 'local' | 'mixed';
   as_of: string;
   request_id: string;
   is_fallback: boolean;
@@ -31,9 +31,16 @@ export interface MarketSnapshot {
   daily_change_pct: number;
   trade_date: string;
   source: string;
+  provider: 'akshare' | 'tushare' | 'fixture' | null;
   origin_source: string | null;
   is_fallback: boolean;
   warning: string | null;
+  fetched_at: string;
+  latest_trade_date: string | null;
+  cache_status: 'not_used' | 'fresh' | 'stale';
+  stale: boolean;
+  cached_at: string | null;
+  is_stale: boolean;
 }
 
 /** 投资者画像 */
@@ -85,6 +92,8 @@ export interface ProfileInput {
 export interface HealthStatus {
   status: string;
   akshare_installed: boolean;
+  tushare_configured: boolean;
+  provider_priority: string[];
   cache_directory: string;
   cache_writable: boolean;
   fixture_path: string;
@@ -108,6 +117,13 @@ export interface CatalogSearchData {
   query: string;
 }
 
+export interface WatchlistData {
+  items: CatalogSymbol[];
+  current_symbol: string | null;
+  comparison_symbols: string[];
+  updated_at: string;
+}
+
 export type ProfilePatch = Partial<ProfileInput>;
 
 export type UiAction =
@@ -129,6 +145,7 @@ export interface ChatToolCall {
   ok: boolean;
   source: string;
   as_of: string | null;
+  is_fallback: boolean;
   error_code: string | null;
   summary: Record<string, unknown>;
 }
@@ -139,6 +156,7 @@ export interface ChatMessage {
   content: string;
   created_at: string;
   status: 'complete' | 'error' | 'cancelled';
+  context_status: 'current' | 'historical';
   source: string;
   as_of: string | null;
   is_fallback: boolean;
@@ -155,7 +173,14 @@ export interface ChatSession {
   symbols: string[];
   risk_symbol: string | null;
   current_allocation_pct: Record<string, number> | null;
+  personalization_active: boolean;
   messages: ChatMessage[];
+}
+
+export interface AdvisorRunStatus {
+  request_id: string;
+  active: boolean;
+  tool_calls: ChatToolCall[];
 }
 
 export interface ChatTurnData {

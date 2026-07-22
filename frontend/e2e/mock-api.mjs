@@ -41,6 +41,7 @@ const advisorResponse = {
       ok: true,
       source: tool === 'get_market_snapshot' || tool === 'analyze_asset_risk' ? 'fixture' : 'system',
       as_of: '2026-07-17',
+      is_fallback: tool === 'get_market_snapshot' || tool === 'analyze_asset_risk',
       error_code: null,
       summary: {},
     })),
@@ -62,6 +63,18 @@ const catalogItems = [
   { symbol: '000001', name: '上证指数', asset_class: '股票', market: 'SH', asset_type: 'index', provider_symbol: 'sh000001' },
 ];
 const sessions = new Map();
+const activeRuns = new Map();
+const cancelledRuns = new Set();
+const defaultWatchlist = catalogItems.slice(0, 4);
+
+function watchlistData(items = defaultWatchlist, current = '510300', comparison = null) {
+  return {
+    items,
+    current_symbol: current,
+    comparison_symbols: comparison ?? items.map((item) => item.symbol),
+    updated_at: '2026-07-21T10:00:00+08:00',
+  };
+}
 
 function envelope(data, source = 'system') {
   return {
@@ -88,6 +101,7 @@ function newSession(title = '新咨询') {
     symbols: [],
     risk_symbol: null,
     current_allocation_pct: null,
+    personalization_active: false,
     messages: [],
   };
   sessions.set(session.id, session);
@@ -112,12 +126,14 @@ function chatTurn(session, content) {
   ];
   const user = {
     id: crypto.randomUUID(), role: 'user', content, created_at: now, status: 'complete',
-    source: 'system', as_of: null, is_fallback: false, tool_calls: [], actions: [],
+    context_status: 'current', source: 'system', as_of: null, is_fallback: false,
+    tool_calls: [], actions: [],
   };
   const assistant = {
     id: crypto.randomUUID(), role: 'assistant', content: advisorResponse.data.content,
     created_at: now, status: 'complete', source: 'fixture', as_of: '2026-07-17',
-    is_fallback: true, tool_calls: advisorResponse.data.tool_calls, actions,
+    context_status: 'current', is_fallback: true,
+    tool_calls: advisorResponse.data.tool_calls, actions,
   };
   session.title = content.slice(0, 24);
   session.profile = profile;
@@ -208,6 +224,45 @@ const server = createServer(async (request, response) => {
     sendJson(response, 200, envelope({ items, catalog_fetched_at: '2026-07-21T09:00:00+08:00', query }, 'akshare'));
     return;
   }
+  if (request.method === 'GET' && url.pathname === '/api/market/watchlist') {
+    sendJson(response, 200, envelope(watchlistData(), 'local'));
+    return;
+  }
+  if (request.method === 'POST' && url.pathname === '/api/market/watchlist/items') {
+    const body = await readJsonBody(request);
+    const item = catalogItems.find((candidate) => candidate.symbol === String(body.symbol));
+    if (!item) {
+      sendJson(response, 400, {
+        ok: false,
+        data: null,
+        meta: envelope(null).meta,
+        warnings: [],
+        error: { code: 'invalid_symbol', message: '标的未通过后端目录校验', retryable: false },
+      });
+      return;
+    }
+    const items = defaultWatchlist.some((candidate) => candidate.symbol === item.symbol)
+      ? defaultWatchlist
+      : [...defaultWatchlist, item];
+    sendJson(response, 200, envelope(watchlistData(items), 'local'));
+    return;
+  }
+  if (request.method === 'DELETE' && url.pathname.startsWith('/api/market/watchlist/items/')) {
+    const symbol = url.pathname.split('/').at(-1);
+    const items = defaultWatchlist.filter((item) => item.symbol !== symbol);
+    sendJson(response, 200, envelope(watchlistData(items, items[0]?.symbol ?? null), 'local'));
+    return;
+  }
+  if (request.method === 'POST' && url.pathname === '/api/market/watchlist/current') {
+    const body = await readJsonBody(request);
+    sendJson(response, 200, envelope(watchlistData(defaultWatchlist, String(body.symbol)), 'local'));
+    return;
+  }
+  if (request.method === 'POST' && url.pathname === '/api/market/watchlist/comparison') {
+    const body = await readJsonBody(request);
+    sendJson(response, 200, envelope(watchlistData(defaultWatchlist, '510300', body.symbols), 'local'));
+    return;
+  }
   if (request.method === 'POST' && url.pathname === '/api/market/compare') {
     const body = await readJsonBody(request);
     const result = filterMarketCompare(fixtures.marketCompare, body.symbols);
@@ -262,7 +317,13 @@ const server = createServer(async (request, response) => {
   if (sessionMatch && request.method === 'GET') {
     const session = sessions.get(sessionMatch[1]);
     if (session) {
-      sendJson(response, 200, envelope(session));
+      const restored = structuredClone(session);
+      restored.messages = restored.messages.map((item) => (
+        item.role === 'assistant' && item.tool_calls.length > 0
+          ? { ...item, context_status: 'historical' }
+          : item
+      ));
+      sendJson(response, 200, envelope(restored));
     } else {
       sendJson(response, 404, { ok: false, data: null, meta: envelope(null).meta, warnings: [], error: { code: 'session_not_found', message: '会话不存在', retryable: false } });
     }
@@ -281,6 +342,33 @@ const server = createServer(async (request, response) => {
       sendJson(response, 404, { ok: false, data: null, meta: envelope(null).meta, warnings: [], error: { code: 'session_not_found', message: '会话不存在', retryable: false } });
       return;
     }
+    const runId = String(body.client_request_id ?? 'unknown-run');
+    if (String(body.content ?? '').includes('停止测试')) {
+      activeRuns.set(runId, [{
+        tool: 'get_market_snapshot',
+        called_at: new Date().toISOString(),
+        ok: true,
+        source: 'fixture',
+        as_of: '2026-07-17',
+        is_fallback: true,
+        error_code: null,
+        summary: {},
+      }]);
+      await new Promise((resolve) => setTimeout(resolve, 1800));
+      activeRuns.delete(runId);
+      if (cancelledRuns.delete(runId)) {
+        if (!response.destroyed) {
+          sendJson(response, 409, {
+            ok: false,
+            data: null,
+            meta: envelope(null).meta,
+            warnings: [],
+            error: { code: 'generation_cancelled', message: '本次生成已终止。', retryable: true },
+          });
+        }
+        return;
+      }
+    }
     sendJson(response, 200, envelope(chatTurn(session, String(body.content ?? '')), 'fixture'));
     return;
   }
@@ -297,7 +385,19 @@ const server = createServer(async (request, response) => {
     return;
   }
   if (request.method === 'POST' && url.pathname.startsWith('/api/advisor/runs/')) {
-    sendJson(response, 200, envelope({ cancelled: true }));
+    const runId = url.pathname.split('/').at(-2);
+    const cancelled = activeRuns.has(runId);
+    if (cancelled) cancelledRuns.add(runId);
+    sendJson(response, 200, envelope({ request_id: runId, cancelled }));
+    return;
+  }
+  if (request.method === 'GET' && url.pathname.startsWith('/api/advisor/runs/')) {
+    const runId = url.pathname.split('/').at(-1);
+    sendJson(response, 200, envelope({
+      request_id: runId,
+      active: activeRuns.has(runId),
+      tool_calls: activeRuns.get(runId) ?? [],
+    }));
     return;
   }
 

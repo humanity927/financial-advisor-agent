@@ -15,8 +15,22 @@ test.describe('Agent consultation', () => {
     await expect(page.getByText('行情快照 · fixture')).toBeVisible();
     await expect(page.getByText('风险指标 · fixture')).toBeVisible();
     await expect(page.getByText('配置建议 · system')).toBeVisible();
-    await expect(page.getByText('已同步到工作台')).toBeVisible();
+    await expect(page.getByText('工作台状态更新')).toBeVisible();
     await expect(page.getByText('数据截至 2026-07-17')).toBeVisible();
+
+    await page.getByRole('button', { name: '重新生成' }).click();
+    await expect(page.getByRole('button', { name: '重新生成' })).toBeEnabled();
+  });
+
+  test('shows live tool progress and stops an in-flight generation', async ({ page }) => {
+    await page.goto('/advisor');
+    await page.getByPlaceholder('输入咨询内容').fill('510300 停止测试');
+    await page.getByRole('button', { name: '发送' }).click();
+
+    await expect(page.getByRole('button', { name: '终止' })).toBeVisible();
+    await expect(page.getByText('行情快照 · fixture')).toBeVisible();
+    await page.getByRole('button', { name: '终止' }).click();
+    await expect(page.getByText('本次生成已终止')).toBeVisible();
   });
 
   test('keeps chat layout within mobile viewport', async ({ page }) => {

@@ -40,10 +40,22 @@ export default function HealthCard() {
             {h.force_fixture ? '演示模式' : '实时模式'}
           </Tag>
         </Descriptions.Item>
-        <Descriptions.Item label="AKShare">{h.akshare_installed ? '✅' : '❌'}</Descriptions.Item>
-        <Descriptions.Item label="Fixtures">{h.fixture_available ? '✅' : '❌'}</Descriptions.Item>
-        <Descriptions.Item label="缓存">{h.cache_writable ? '✅' : '❌'}</Descriptions.Item>
+        <Descriptions.Item label="AKShare">
+          <Tag color={h.akshare_installed ? 'green' : 'red'}>
+            {h.akshare_installed ? '已就绪' : '未安装'}
+          </Tag>
+        </Descriptions.Item>
+        <Descriptions.Item label="Tushare">
+          <Tag color={h.tushare_configured ? 'cyan' : 'default'}>
+            {h.tushare_configured ? '已配置' : '未配置'}
+          </Tag>
+        </Descriptions.Item>
+        <Descriptions.Item label="真实缓存">{h.cache_writable ? '可写' : '不可写'}</Descriptions.Item>
+        <Descriptions.Item label="演示数据">{h.fixture_available ? '可用' : '不可用'}</Descriptions.Item>
         <Descriptions.Item label="支持标的">{h.supported_symbol_count} 只</Descriptions.Item>
+        <Descriptions.Item label="来源优先级" span={2}>
+          {h.provider_priority.join(' → ')}
+        </Descriptions.Item>
       </Descriptions>
     </Card>
   );

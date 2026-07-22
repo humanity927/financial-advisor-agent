@@ -9,6 +9,9 @@ from typing import Any
 
 import httpx
 from dotenv import dotenv_values
+from pydantic import ValidationError
+
+from finance_advisor.agent.model_config import load_model_runtime_config
 
 TOOLS = [
     {
@@ -77,6 +80,7 @@ def check_endpoint(
     base_url: str,
     api_key: str,
     model: str,
+    timeout_seconds: float,
 ) -> None:
     if not base_url.startswith(("http://", "https://")):
         raise PreflightError(f"{label}: base URL is invalid")
@@ -87,7 +91,9 @@ def check_endpoint(
 
     leaked_values = [value for value in (api_key, base_url) if value]
     visible_text: list[str] = []
-    with httpx.Client(timeout=httpx.Timeout(45.0, connect=15.0)) as client:
+    with httpx.Client(
+        timeout=httpx.Timeout(timeout_seconds, connect=min(timeout_seconds, 15.0))
+    ) as client:
         models_ok = False
         try:
             response = client.get(f"{base_url.rstrip('/')}/models", headers=_headers(api_key))
@@ -187,11 +193,15 @@ def main() -> int:
 
     values = {**dotenv_values(args.env_file), **os.environ}
     relay_key = str(values.get("RELAY_API_KEY") or "")
-    relay_url = str(values.get("RELAY_BASE_URL") or "")
-    relay_model = str(values.get("RELAY_MODEL_ID") or "")
     deepseek_key = str(values.get("DEEPSEEK_API_KEY") or "")
 
-    if not relay_key or "example.invalid" in relay_url:
+    try:
+        runtime = load_model_runtime_config(args.env_file)
+    except ValidationError:
+        print("Model preflight failed: model runtime configuration is invalid", file=sys.stderr)
+        return 1
+
+    if not relay_key or "example.invalid" in runtime.primary_base_url_text:
         message = "Primary relay preflight skipped: configure RELAY_BASE_URL and RELAY_API_KEY"
         if args.require_model:
             print(message, file=sys.stderr)
@@ -202,23 +212,33 @@ def main() -> int:
     try:
         check_endpoint(
             label="primary relay",
-            base_url=relay_url,
+            base_url=runtime.primary_base_url_text,
             api_key=relay_key,
-            model=relay_model,
+            model=runtime.primary_model,
+            timeout_seconds=runtime.request_timeout_seconds,
         )
-        if deepseek_key:
+        if runtime.fallback_enabled and deepseek_key:
             check_endpoint(
                 label="DeepSeek fallback",
-                base_url="https://api.deepseek.com/v1",
+                base_url=runtime.deepseek_base_url_text,
                 api_key=deepseek_key,
-                model="deepseek-chat",
+                model=runtime.deepseek_model,
+                timeout_seconds=runtime.request_timeout_seconds,
             )
-        elif args.require_model:
+        elif runtime.fallback_enabled and args.require_model:
             raise PreflightError("DeepSeek fallback key is empty")
-        else:
+        elif runtime.fallback_enabled:
             print("DeepSeek fallback preflight skipped: DEEPSEEK_API_KEY is empty")
-    except (httpx.HTTPError, json.JSONDecodeError, PreflightError) as exc:
+        else:
+            print("DeepSeek fallback preflight disabled by configuration")
+    except PreflightError as exc:
         print(f"Model preflight failed: {exc}", file=sys.stderr)
+        return 1
+    except (httpx.HTTPError, json.JSONDecodeError) as exc:
+        print(
+            f"Model preflight failed: endpoint request failed ({type(exc).__name__})",
+            file=sys.stderr,
+        )
         return 1
     return 0
 
