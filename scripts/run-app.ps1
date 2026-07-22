@@ -19,6 +19,30 @@ $FrontendDir = Join-Path $Root "frontend"
 $FrontendDist = Join-Path $FrontendDir "dist"
 $FrontendPackage = Join-Path $FrontendDir "package.json"
 $HermesHome = Join-Path $Root ".runtime\hermes"
+$RuntimeEnv = Join-Path $HermesHome ".env"
+
+function Import-RuntimeEnvValue {
+    param([Parameter(Mandatory)][string]$Name)
+
+    if ([Environment]::GetEnvironmentVariable($Name, "Process")) {
+        return
+    }
+    if (-not (Test-Path $RuntimeEnv)) {
+        return
+    }
+
+    foreach ($Line in [IO.File]::ReadAllLines($RuntimeEnv, [Text.Encoding]::UTF8)) {
+        if ($Line -match "^\s*$([Regex]::Escape($Name))\s*=(.*)$") {
+            $Value = $Matches[1].Trim().Trim('"').Trim("'")
+            if ($Value) {
+                [Environment]::SetEnvironmentVariable($Name, $Value, "Process")
+            }
+            return
+        }
+    }
+}
+
+Import-RuntimeEnvValue -Name "TUSHARE_TOKEN"
 
 $env:FINANCE_PROJECT_ROOT = $Root
 $env:HERMES_HOME = $HermesHome

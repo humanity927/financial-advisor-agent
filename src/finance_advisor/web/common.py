@@ -39,7 +39,7 @@ def get_market_service() -> MarketService:
     global _market_service
     if _market_service is None:
         _market_service = MarketService(
-            AkshareProvider(timeout_seconds=5.0, max_retries=1),
+            AkshareProvider(timeout_seconds=30.0, max_retries=1),
             CacheProvider(get_cache_dir()),
             FixtureProvider(get_fixture_path()),
             supplemental=TushareProvider(timeout_seconds=8.0, max_retries=1),
