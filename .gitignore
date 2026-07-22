@@ -10,6 +10,7 @@ __pycache__/
 htmlcov/
 dist/
 build/
+docs/
 .env
 
 # Local collaboration document, kept outside version control.
