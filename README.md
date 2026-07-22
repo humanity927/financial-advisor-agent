@@ -1,4 +1,4 @@
-# 金融理财咨询智能 Agent
+# 深睡金股：金融理财咨询智能 Agent
 
 基于 Hermes Agent、MCP、AKShare、Tushare 和确定性风险模型的教学演示项目。系统查询 A 股指数与 ETF 行情、评估用户风险承受能力、计算历史风险指标并生成透明的四类资产配置。系统不执行交易，不构成投资建议。
 
@@ -19,6 +19,14 @@ React 工作台
 ```
 
 Hermes 固定在 `v2026.7.7.2` / `9de9c25f620ff7f1ce0fd5457d596052d5159596`，位于 `vendor/hermes-agent` 并用于上游源码审计。运行时安装相同版本的官方发布 wheel，因为固定提交不追踪 Dashboard 的预构建资源。业务代码不会修改或 import Hermes 私有模块。
+
+## Web 工作台
+
+“深睡金股”前端采用 React、Ant Design 和 Lucide 图标构建，覆盖总览、行情对比、风险实验室、配置规划、正式报告、Agent 咨询和历史记录。品牌图形位于 `frontend/public/brand-mark.svg`，侧栏、移动端标题和浏览器 favicon 复用同一资产。
+
+工作台使用统一的内容宽度、16px 页面节奏、克制的 4/6/8px 圆角和中国市场红涨绿跌语义。桌面侧栏展开宽度为 228px、收起宽度为 72px；风险实验室、配置规划和正式报告共用 `304-336px + 主工作区` 的投资者画像网格，并在窄屏和手机端自动切换为单列布局。
+
+总览中的“已校验标的”统计来自后端动态标的目录，只表示元数据已通过白名单校验，不保证每项此刻都有可用行情。默认市场快照由目录按大盘、核心宽基、中小盘、成长、债券和黄金方向选取代表标的，并优先纳入最多两个当前对比标的，去重后最多展示八项；前端不再维护写死的默认代码列表。
 
 ## Windows 快速开始
 
@@ -86,6 +94,8 @@ FastAPI 工作台默认只绑定回环地址：
 ```text
 GET  /api/health
 GET  /api/market/catalog/search?q=沪深300
+GET  /api/market/catalog/search?q=&refresh=false&representative=true
+GET  /api/market/watchlist
 GET  /api/market/snapshot?symbols=510300,000300
 POST /api/market/compare
 POST /api/risk/profile
@@ -102,7 +112,7 @@ POST            /api/sessions/{session_id}/regenerate
 POST            /api/sessions/{session_id}/actions
 ```
 
-行情中心可按代码或名称搜索 A 股 ETF，并包含一组内置 A 股指数元数据。AKShare 或 Tushare 返回的目录会在代码、名称、市场和资产类型校验后持久化到 `.runtime/market-catalog.json`。关注列表持久化在 `.runtime/watchlist.json`，最多 8 个标的，支持添加、删除、切换和比较。`POST /api/market/compare` 的 `range` 可选 `1M`、`3M`、`1Y`，返回共同交易日对齐后的归一化曲线、区间收益、行情快照、provider、抓取时间、最近交易日和缓存状态。
+行情中心可按代码或名称搜索 A 股指数或 ETF，并包含一组内置 A 股指数元数据。AKShare 或 Tushare 返回的目录会在代码、名称、市场和资产类型校验后持久化到 `.runtime/market-catalog.json`。关注列表持久化在 `.runtime/watchlist.json`，最多 8 个标的，支持添加、删除、切换和比较。`POST /api/market/compare` 的 `range` 可选 `1M`、`3M`、`1Y`，返回共同交易日对齐后的归一化曲线、区间收益、行情快照、provider、抓取时间、最近交易日和缓存状态。
 
 风险端点复用 `risk/profile.py`、`risk/metrics.py` 和 `risk/portfolio.py` 的确定性计算：`/api/risk/profile` 返回六维画像，`/api/risk/assets` 返回单资产历史风险指标，`/api/risk/portfolio` 返回组合风险、相关性、净值和回撤曲线。所有结果都带有数据来源、时间和演示/回退告警；历史统计不代表未来收益。
 
@@ -163,6 +173,10 @@ cd ..
 ```
 
 `preflight.ps1` 在未配置模型密钥时仍会完成本地金融核心和 MCP 检查，并明确跳过联网模型测试。答辩前必须使用 `-RequireModel` 完成真实模型及备用通道验证。
+
+## 版本控制约定
+
+`.env`、`.runtime/`、`dist/`、`build/` 和 `docs/` 均为本地文件或生成产物，不进入版本控制。真实 API Key、Token、缓存、会话、日志、浏览器截图和临时交接文档不得提交；需要长期维护的项目说明应更新到本 README 或对应源码注释中。
 
 ## 常见问题
 
